@@ -1,36 +1,58 @@
-import Image from "next/image";
+import { FinanceChart } from "@/components/FinanceChart";
+import { ArrowUpRight, ArrowDownRight, DollarSign } from "lucide-react";
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col p-8 bg-zinc-950 text-zinc-50">
-      <header className="flex justify-between items-center mb-12">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Finance AI</h1>
-          <p className="text-zinc-400">
-            Bem-vindo, Victor. Veja seus insights hoje.
-          </p>
-        </div>
-        <div className="h-10 w-10 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center">
-          <span className="text-emerald-500 font-medium">V</span>
-        </div>
+    <main className="p-8 space-y-8">
+      <header>
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <p className="text-zinc-400 text-sm">
+          Acompanhe sua saúde financeira e insights de IA.
+        </p>
       </header>
 
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/50">
-          <p className="text-sm text-zinc-400">Saldo Total</p>
-          <h2 className="text-3xl font-bold mt-2">R$ 4.250,00</h2>
-        </div>
-        <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/50">
-          <p className="text-sm text-zinc-400 text-emerald-400">Entradas</p>
-          <h2 className="text-3xl font-bold mt-2 text-emerald-500">
-            + R$ 1.200,00
-          </h2>
-        </div>
-        <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/50">
-          <p className="text-sm text-zinc-400 text-rose-400">Saídas</p>
-          <h2 className="text-3xl font-bold mt-2 text-rose-500">- R$ 460,00</h2>
-        </div>
+        <SummaryCard
+          title="Saldo Total"
+          amount="R$ 4.250,00"
+          icon={<DollarSign size={20} />}
+        />
+        <SummaryCard
+          title="Entradas"
+          amount="R$ 1.200,00"
+          icon={<ArrowUpRight size={20} />}
+          trend="positive"
+        />
+        <SummaryCard
+          title="Saídas"
+          amount="R$ 460,00"
+          icon={<ArrowDownRight size={20} />}
+          trend="negative"
+        />
+      </section>
+
+      <section>
+        <FinanceChart />
       </section>
     </main>
+  );
+}
+
+function SummaryCard({ title, amount, icon, trend }: any) {
+  return (
+    <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/50 space-y-2">
+      <div className="flex justify-between items-center text-zinc-400">
+        <span className="text-sm font-medium">{title}</span>
+        {icon}
+      </div>
+      <h2 className="text-3xl font-bold tracking-tight">{amount}</h2>
+      {trend && (
+        <p
+          className={`text-xs ${trend === "positive" ? "text-emerald-500" : "text-rose-500"}`}
+        >
+          {trend === "positive" ? "+12%" : "-4%"} em relação ao mês passado
+        </p>
+      )}
+    </div>
   );
 }
