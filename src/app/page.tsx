@@ -1,5 +1,6 @@
 import { FinanceChart } from "@/components/FinanceChart";
 import { ArrowUpRight, ArrowDownRight, DollarSign } from "lucide-react";
+import { TransactionList } from "@/components/TransactionList";
 
 export default function Home() {
   return (
@@ -33,6 +34,20 @@ export default function Home() {
 
       <section>
         <FinanceChart />
+      </section>
+
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <TransactionList />
+        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-6 flex flex-col justify-center">
+          <h3 className="text-emerald-500 font-bold mb-2 flex items-center gap-2">
+            Insight da IA
+          </h3>
+          <p className="text-zinc-300 text-sm leading-relaxed">
+            Seus gastos com <strong>Lazer</strong> diminuíram 15% esta semana.
+            Isso te ajudará a atingir sua meta de reserva para a viagem de maio
+            mais rápido!
+          </p>
+        </div>
       </section>
     </main>
   );
