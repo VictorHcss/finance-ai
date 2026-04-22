@@ -15,7 +15,7 @@ const menuItems = [
   { icon: Receipt, label: "Transações", href: "/transactions" },
   { icon: Wallet, label: "Planejamento", href: "/planejamento" },
   { icon: BrainCircuit, label: "Insights IA", href: "/insights" },
-  { icon: Settings, label: "Configurações", href: "/configuracoes" },
+  { icon: Settings, label: "Configurações", href: "/settings" },
 ];
 
 export function Sidebar() {
