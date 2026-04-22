@@ -2,17 +2,27 @@ import {
   LayoutDashboard,
   Wallet,
   Receipt,
-  TrendingUp,
   Settings,
   BrainCircuit,
 } from "lucide-react";
+import Link from "next/link";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", active: true },
-  { icon: Receipt, label: "Transações", active: false },
-  { icon: Wallet, label: "Planejamento", active: false },
-  { icon: BrainCircuit, label: "Insights IA", active: false },
-  { icon: Settings, label: "Configurações", active: false },
+  { icon: LayoutDashboard, label: "Dashboard", href: "/", active: true },
+  { icon: Receipt, label: "Transações", href: "/transacoes", active: false },
+  { icon: Wallet, label: "Planejamento", href: "/planejamento", active: false },
+  {
+    icon: BrainCircuit,
+    label: "Insights IA",
+    href: "/insights",
+    active: false,
+  },
+  {
+    icon: Settings,
+    label: "Configurações",
+    href: "/configuracoes",
+    active: false,
+  },
 ];
 
 export function Sidebar() {
@@ -26,8 +36,9 @@ export function Sidebar() {
 
       <nav className="flex-1 px-4 space-y-2">
         {menuItems.map((item) => (
-          <button
+          <Link
             key={item.label}
+            href={item.href}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
               item.active
                 ? "bg-emerald-500/10 text-emerald-500"
@@ -36,7 +47,7 @@ export function Sidebar() {
           >
             <item.icon size={20} />
             {item.label}
-          </button>
+          </Link>
         ))}
       </nav>
 
