@@ -13,7 +13,7 @@ import { usePathname } from "next/navigation";
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
   { icon: Receipt, label: "Transações", href: "/transactions" },
-  { icon: Wallet, label: "Planejamento", href: "/planejamento" },
+  { icon: Wallet, label: "Planejamento", href: "/planning" },
   { icon: BrainCircuit, label: "Insights IA", href: "/insights" },
   { icon: Settings, label: "Configurações", href: "/settings" },
 ];
