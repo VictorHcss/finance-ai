@@ -1,6 +1,20 @@
-import { FinanceChart } from "@/components/FinanceChart";
+"use client";
+
+import dynamic from "next/dynamic";
 import { ArrowUpRight, ArrowDownRight, DollarSign } from "lucide-react";
 import { TransactionList } from "@/components/TransactionList";
+
+const FinanceChart = dynamic(
+  () => import("@/components/FinanceChart").then((mod) => mod.FinanceChart),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[300px] w-full bg-zinc-900/50 rounded-xl animate-pulse flex items-center justify-center text-zinc-500">
+        Carregando gráfico...
+      </div>
+    ),
+  },
+);
 
 export default function Home() {
   return (
@@ -63,7 +77,9 @@ function SummaryCard({ title, amount, icon, trend }: any) {
       <h2 className="text-3xl font-bold tracking-tight">{amount}</h2>
       {trend && (
         <p
-          className={`text-xs ${trend === "positive" ? "text-emerald-500" : "text-rose-500"}`}
+          className={`text-xs ${
+            trend === "positive" ? "text-emerald-500" : "text-rose-500"
+          }`}
         >
           {trend === "positive" ? "+12%" : "-4%"} em relação ao mês passado
         </p>
