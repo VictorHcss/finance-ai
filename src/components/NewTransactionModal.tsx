@@ -2,51 +2,46 @@
 
 import { useState } from "react";
 import { X, Plus } from "lucide-react";
+import { api } from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 export function NewTransactionModal() {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [type, setType] = useState("income");
   const [category, setCategory] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    setLoading(true);
 
     const newTransaction = {
       description,
       amount: parseFloat(amount),
-      type,
+      type: type as "income" | "expense",
       category,
       date: new Date().toISOString(),
     };
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/transactions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newTransaction),
-      });
+      await api.createTransaction(newTransaction);
+      
+      setIsOpen(false);
+      setDescription("");
+      setAmount("");
+      setCategory("");
+      setType("income");
 
-      if (response.ok) {
-        alert("Transação salva com sucesso! 🚀");
-
-        // fechar modal
-        setIsOpen(false);
-
-        // limpar campos
-        setDescription("");
-        setAmount("");
-        setCategory("");
-        setType("income");
-      } else {
-        alert("Erro ao salvar transação.");
-      }
+      // Recarrega os dados sem reload total da página se possível
+      router.refresh();
+      window.dispatchEvent(new Event("transaction-added"));
     } catch (error) {
-      console.error("Erro ao conectar com o servidor:", error);
-      alert("Erro de conexão com o servidor.");
+      console.error("Erro ao salvar transação:", error);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -54,11 +49,13 @@ export function NewTransactionModal() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-8 right-8 bg-emerald-600 hover:bg-emerald-500 text-white p-4 rounded-full shadow-lg shadow-emerald-900/20 transition-all flex items-center gap-2 group"
+        className="fixed bottom-8 right-8 flex items-center gap-2 px-4 py-4 md:px-6 md:py-4 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-semibold shadow-[0_10px_20px_rgba(16,185,129,0.2)] ring-1 ring-white/20 hover:shadow-[0_15px_30px_rgba(16,185,129,0.4)] hover:-translate-y-1 active:scale-95 transition-all duration-300 ease-out group z-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-zinc-950"
+        aria-label="Nova Transação"
+        title="Nova Transação"
       >
-        <Plus size={24} />
+        <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300" />
 
-        <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-500 ease-in-out font-medium">
+        <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-500 ease-in-out whitespace-nowrap tracking-tight">
           Nova Transação
         </span>
       </button>
@@ -90,7 +87,7 @@ export function NewTransactionModal() {
               placeholder="Ex: Venda de produto"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 transition-all"
               required
             />
           </div>
@@ -107,7 +104,7 @@ export function NewTransactionModal() {
                 placeholder="R$ 0,00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 transition-all"
                 required
               />
             </div>
@@ -120,7 +117,7 @@ export function NewTransactionModal() {
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 transition-all"
               >
                 <option value="income">Entrada</option>
                 <option value="expense">Saída</option>
@@ -138,16 +135,17 @@ export function NewTransactionModal() {
               placeholder="Ex: Lazer, Freelance..."
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 transition-all"
               required
             />
           </div>
 
           <button
             type="submit"
-            className="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-lg font-bold text-sm transition-colors mt-4"
+            disabled={loading}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-lg font-bold text-sm transition-colors mt-4 disabled:opacity-50"
           >
-            Salvar Transação
+            {loading ? "Salvando..." : "Salvar Transação"}
           </button>
         </form>
       </div>

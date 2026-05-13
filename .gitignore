@@ -47,3 +47,10 @@ backend/env/
 __pycache__/
 *.py[cod]
 .python-version
+
+# Database
+*.db
+*.sqlite3
+
+# Local settings
+.vscode/

@@ -13,7 +13,9 @@ interface Transaction {
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   // Função para buscar dados do Python
   async function fetchTransactions() {
@@ -21,6 +23,7 @@ export default function TransactionsPage() {
       const response = await fetch("http://127.0.0.1:8000/api/transactions");
       const data = await response.json();
       setTransactions(data);
+      setFilteredTransactions(data);
     } catch (error) {
       console.error("Erro ao carregar transações:", error);
     } finally {
@@ -32,12 +35,34 @@ export default function TransactionsPage() {
     fetchTransactions();
   }, []);
 
+  useEffect(() => {
+    const filtered = transactions.filter((t) =>
+      t.description.toLowerCase().includes(search.toLowerCase()) ||
+      t.category.toLowerCase().includes(search.toLowerCase())
+    );
+    setFilteredTransactions(filtered);
+  }, [search, transactions]);
+
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-6">
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-bold">Extrato</h1>
           <p className="text-zinc-400">Gerencie seu histórico financeiro</p>
+        </div>
+
+        <div className="relative group">
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-emerald-500 transition-colors"
+            size={18}
+          />
+          <input
+            type="text"
+            placeholder="Buscar transações..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-zinc-900 border border-zinc-800 rounded-xl py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all w-64"
+          />
         </div>
       </div>
 
@@ -59,14 +84,14 @@ export default function TransactionsPage() {
                   Carregando...
                 </td>
               </tr>
-            ) : transactions.length === 0 ? (
+            ) : filteredTransactions.length === 0 ? (
               <tr>
                 <td colSpan={4} className="p-8 text-center text-zinc-500">
                   Nenhuma transação encontrada.
                 </td>
               </tr>
             ) : (
-              transactions.map((t, index) => (
+              filteredTransactions.map((t, index) => (
                 <tr
                   key={index}
                   className="hover:bg-zinc-800/30 transition-colors"

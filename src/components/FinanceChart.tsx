@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -10,15 +11,16 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const data = [
-  { name: "Jan", total: 2400 },
-  { name: "Fev", total: 1398 },
-  { name: "Mar", total: 9800 },
-  { name: "Abr", total: 3908 },
-  { name: "Mai", total: 4800 },
-];
-
 export function FinanceChart() {
+  const [data, setData] = useState([]);
+
+  useEffect(() => {
+    fetch("http://127.0.0.1:8000/api/chart-data")
+      .then((res) => res.json())
+      .then((data) => setData(data))
+      .catch((err) => console.error("Erro ao carregar dados do gráfico:", err));
+  }, []);
+
   return (
     <div className="min-w-0 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
       <h3 className="mb-4 text-sm font-medium text-zinc-400">Fluxo Mensal</h3>

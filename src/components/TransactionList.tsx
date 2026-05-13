@@ -1,116 +1,89 @@
-import { ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+"use client";
 
-const transactions = [
-  {
-    id: 1,
-    description: "Salário Mensal",
-    category: "Trabalho",
-    amount: 5000,
-    date: "20/04/2026",
-    type: "income",
-  },
-  {
-    id: 2,
-    description: "Aluguel",
-    category: "Moradia",
-    amount: 1500,
-    date: "01/04/2026",
-    type: "expense",
-  },
-  {
-    id: 3,
-    description: "Freelance",
-    category: "Trabalho",
-    amount: 2000,
-    date: "15/04/2026",
-    type: "income",
-  },
-  {
-    id: 4,
-    description: "Supermercado",
-    category: "Alimentação",
-    amount: 300,
-    date: "10/04/2026",
-    type: "expense",
-  },
-  {
-    id: 5,
-    description: "Investimentos",
-    category: "Patrimônio",
-    amount: 1000,
-    date: "25/04/2026",
-    type: "income",
-  },
-  {
-    id: 6,
-    description: "Academia",
-    category: "Saúde",
-    amount: 100,
-    date: "12/04/2026",
-    type: "expense",
-  },
-  {
-    id: 7,
-    description: "Transporte",
-    category: "Transporte",
-    amount: 200,
-    date: "18/04/2026",
-    type: "expense",
-  },
-  {
-    id: 8,
-    description: "Venda de item usado",
-    category: "Outros",
-    amount: 150,
-    date: "22/04/2026",
-    type: "income",
-  },
-];
+import { useEffect, useState, useCallback } from "react";
+import { ArrowUpCircle, ArrowDownCircle, Receipt } from "lucide-react";
+import { api, Transaction } from "@/lib/api";
 
 export function TransactionList() {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadTransactions = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await api.getTransactions();
+      setTransactions(data);
+    } catch (err) {
+      console.error("Erro ao carregar transações:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTransactions();
+    
+    // Escuta evento customizado para atualizar lista quando nova transação for adicionada
+    window.addEventListener("transaction-added", loadTransactions);
+    return () => window.removeEventListener("transaction-added", loadTransactions);
+  }, [loadTransactions]);
+
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="font-bold text-lg text-zinc-100">Transações Recentes</h3>
-        <button className="text-sm text-emerald-500 hover:text-emerald-400 transition-colors">
-          Ver todas
-        </button>
+    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
+      <div className="flex items-center gap-2 mb-6">
+        <Receipt className="text-emerald-500" size={20} />
+        <h2 className="text-lg font-bold">Transações Recentes</h2>
       </div>
 
-      <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-        {transactions.map((t) => (
-          <div
-            key={t.id}
-            className="flex items-center justify-between p-3 rounded-lg hover:bg-zinc-800/30 transition-colors border border-transparent hover:border-zinc-800"
-          >
-            <div className="flex items-center gap-4">
-              {t.type === "income" ? (
-                <ArrowUpCircle className="text-emerald-500" size={24} />
-              ) : (
-                <ArrowDownCircle className="text-rose-500" size={24} />
-              )}
-              <div>
-                <p className="font-medium text-sm text-zinc-200">
-                  {t.description}
-                </p>
-                <p className="text-xs text-zinc-500">{t.category}</p>
+      <div className="space-y-4">
+        {loading ? (
+          [1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex justify-between items-center border-b border-zinc-800/50 pb-3 last:border-0 animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-zinc-800 rounded-full"></div>
+                <div className="space-y-2">
+                  <div className="h-4 bg-zinc-800 rounded w-24"></div>
+                  <div className="h-3 bg-zinc-800 rounded w-16"></div>
+                </div>
               </div>
+              <div className="h-4 bg-zinc-800 rounded w-20"></div>
             </div>
+          ))
+        ) : transactions.length === 0 ? (
+          <p className="text-zinc-500 text-sm text-center py-4">Nenhuma atividade recente.</p>
+        ) : (
+          transactions.slice(0, 5).map((t, i) => (
+            <div
+              key={i}
+              className="flex justify-between items-center border-b border-zinc-800/50 pb-3 last:border-0"
+            >
+              <div className="flex items-center gap-3">
+                {t.type === "income" ? (
+                  <ArrowUpCircle className="text-emerald-500" size={20} />
+                ) : (
+                  <ArrowDownCircle className="text-rose-500" size={20} />
+                )}
 
-            <div className="text-right">
+                <div>
+                  <p className="text-sm font-medium text-white">{t.description}</p>
+                  <p className="text-xs text-zinc-500">{t.category}</p>
+                </div>
+              </div>
+
               <p
-                className={`font-semibold text-sm ${t.type === "income" ? "text-emerald-500" : "text-zinc-100"}`}
+                className={`text-sm font-bold ${
+                  t.type === "income" ? "text-emerald-500" : "text-zinc-100"
+                }`}
               >
-                {t.type === "income" ? `+ ` : `- `}
-                {t.amount.toLocaleString("pt-BR", {
+                {t.type === "expense" ? "- " : "+ "}
+                {new Intl.NumberFormat("pt-BR", {
                   style: "currency",
                   currency: "BRL",
-                })}
+                }).format(t.amount)}
               </p>
-              <p className="text-xs text-zinc-500">{t.date}</p>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
