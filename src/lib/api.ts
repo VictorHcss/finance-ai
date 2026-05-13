@@ -1,4 +1,6 @@
-export const API_URL = "http://localhost:8000/api";
+// Altere a primeira linha para isto:
+export const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 export type Transaction = {
   id?: number;
@@ -19,6 +21,7 @@ export type Goal = {
   deadline?: string;
   completed: boolean;
 };
+export type GoalStatus = "active" | "completed" | "all";
 
 export type InsightData = {
   alerta: string;
