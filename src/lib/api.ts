@@ -1,4 +1,3 @@
-// Altere a primeira linha para isto:
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
@@ -21,6 +20,7 @@ export type Goal = {
   deadline?: string;
   completed: boolean;
 };
+
 export type GoalStatus = "active" | "completed" | "all";
 
 export type InsightData = {
@@ -35,10 +35,16 @@ export type InsightData = {
   }[];
 };
 
+export type DashboardSummary = {
+  incomes: number;
+  expenses: number;
+  total: number;
+};
+
 const fetchWithTimeout = async (
   url: string,
   options: RequestInit = {},
-  timeout = 5000,
+  timeout = 10000,
 ) => {
   const controller = new AbortController();
 
@@ -59,7 +65,9 @@ const fetchWithTimeout = async (
     return await response.json();
   } catch (error) {
     clearTimeout(id);
+
     console.error(`Fetch error on ${url}:`, error);
+
     throw error;
   }
 };
@@ -70,12 +78,14 @@ export const api = {
     fetchWithTimeout(`${API_URL}/reset`, {
       method: "DELETE",
     }),
-
   // Transactions
+
   getTransactions: async (): Promise<Transaction[]> => {
     try {
       return await fetchWithTimeout(`${API_URL}/transactions`);
     } catch (e) {
+      console.error("Erro ao buscar transações:", e);
+
       return [];
     }
   },
@@ -90,11 +100,19 @@ export const api = {
     });
   },
 
+  deleteTransaction: async (id: number) => {
+    return await fetchWithTimeout(`${API_URL}/transactions/${id}`, {
+      method: "DELETE",
+    });
+  },
+
   // Goals
   getGoalsStatus: async (): Promise<Goal[]> => {
     try {
       return await fetchWithTimeout(`${API_URL}/goals/status`);
     } catch (e) {
+      console.error("Erro ao buscar metas:", e);
+
       return [];
     }
   },
@@ -131,11 +149,14 @@ export const api = {
     });
   },
 
+
   // Dashboard
-  getSummary: async () => {
+  getSummary: async (): Promise<DashboardSummary> => {
     try {
       return await fetchWithTimeout(`${API_URL}/dashboard-summary`);
     } catch (e) {
+      console.error("Erro ao buscar resumo:", e);
+
       return {
         incomes: 0,
         expenses: 0,
@@ -149,6 +170,8 @@ export const api = {
     try {
       return await fetchWithTimeout(`${API_URL}/insights`);
     } catch (e) {
+      console.error("Erro ao buscar insights:", e);
+
       return null;
     }
   },
@@ -158,6 +181,8 @@ export const api = {
     try {
       return await fetchWithTimeout(`${API_URL}/chart-data`);
     } catch (e) {
+      console.error("Erro ao buscar gráficos:", e);
+
       return [];
     }
   },

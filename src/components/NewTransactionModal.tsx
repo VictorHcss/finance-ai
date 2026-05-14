@@ -84,7 +84,7 @@ export function NewTransactionModal() {
 
             <input
               type="text"
-              placeholder="Ex: Venda de produto"
+              placeholder="Ex: Salário, Netflix..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 transition-all"
@@ -132,7 +132,7 @@ export function NewTransactionModal() {
 
             <input
               type="text"
-              placeholder="Ex: Lazer, Freelance..."
+              placeholder="Ex: Lazer, Despesas Fixas..."
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 transition-all"
