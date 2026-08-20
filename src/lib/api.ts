@@ -100,6 +100,16 @@ export const api = {
     });
   },
 
+  updateTransaction: async (id: number, data: Partial<Transaction>) => {
+    return await fetchWithTimeout(`${API_URL}/transactions/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+  },
+
   deleteTransaction: async (id: number) => {
     return await fetchWithTimeout(`${API_URL}/transactions/${id}`, {
       method: "DELETE",

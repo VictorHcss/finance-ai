@@ -194,6 +194,45 @@ def get_transactions():
     return [dict(row) for row in rows]
 
 
+@app.put("/api/transactions/{transaction_id}")
+def update_transaction(transaction_id: int, transaction: Transaction):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                UPDATE transactions
+                SET description = ?, amount = ?, type = ?, category = ?, date = ?
+                WHERE id = ?
+            """, (
+                transaction.description,
+                transaction.amount,
+                transaction.type,
+                transaction.category,
+                transaction.date,
+                transaction_id,
+            ))
+
+            conn.commit()
+
+            if cursor.rowcount == 0:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Transação não encontrada"
+                )
+
+        return {
+            "status": "success",
+            "message": "Transação atualizada"
+        }
+
+    except sqlite3.Error as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao atualizar transação: {str(e)}"
+        )
+
+
 @app.delete("/api/transactions/{transaction_id}")
 def delete_transaction(transaction_id: int):
     try:
@@ -206,6 +245,16 @@ def delete_transaction(transaction_id: int):
             """, (transaction_id,))
 
             conn.commit()
+
+            # cursor.rowcount diz quantas linhas o DELETE realmente
+            # afetou. Sem essa checagem, apagar um ID que não existe
+            # "funcionava" silenciosamente e devolvia sucesso mesmo
+            # sem apagar nada.
+            if cursor.rowcount == 0:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Transação não encontrada"
+                )
 
         return {
             "status": "success",

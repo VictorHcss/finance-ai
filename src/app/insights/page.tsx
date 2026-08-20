@@ -73,7 +73,7 @@ export default function InsightsPage() {
   }
 
   return (
-    <main className="p-8 space-y-8 animate-in fade-in duration-500">
+    <main className="p-4 sm:p-8 space-y-8 animate-in fade-in duration-500">
       {/* Header com Status Dinâmico */}
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -265,7 +265,7 @@ export default function InsightsPage() {
             <div>
               <p className="text-sm text-zinc-300 font-bold mb-1">Gastos Variáveis</p>
               <p className="text-xs text-zinc-500 leading-relaxed">
-                Sua categoria 'Alimentação' reduziu 10%. Continue com o bom gerenciamento!
+                Sua categoria “Alimentação” reduziu 10%. Continue com o bom gerenciamento!
               </p>
             </div>
           </div>
@@ -274,7 +274,7 @@ export default function InsightsPage() {
             <div>
               <p className="text-sm text-zinc-300 font-bold mb-1">Metas Próximas</p>
               <p className="text-xs text-zinc-500 leading-relaxed">
-                Você está a <span className="text-blue-400 font-bold">R$ 450,00</span> de completar sua 'Reserva de Emergência'.
+                Você está a <span className="text-blue-400 font-bold">R$ 450,00</span> de completar sua “Reserva de Emergência”.
               </p>
             </div>
           </div>

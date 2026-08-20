@@ -1,8 +1,8 @@
-import { User, Bell, Shield, Palette, Database } from "lucide-react";
+import { User, Bell, Database } from "lucide-react";
 
 export default function SettingsPage() {
   return (
-    <main className="p-8 space-y-8">
+    <main className="p-4 sm:p-8 space-y-8">
       <header>
         <h1 className="text-2xl font-bold">Configurações</h1>
         <p className="text-zinc-400 text-sm">

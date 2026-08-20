@@ -10,14 +10,31 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { api } from "@/lib/api";
+
+// O backend devolve, por mês: { name, income, expense } — sem campo "total".
+// Esse tipo documenta isso, então o TypeScript nos avisa se o formato mudar.
+type ChartPoint = {
+  name: string;
+  income: number;
+  expense: number;
+};
 
 export function FinanceChart() {
-  const [data, setData] = useState([]);
+  const [data, setData] = useState<(ChartPoint & { total: number })[]>([]);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/chart-data")
-      .then((res) => res.json())
-      .then((data) => setData(data))
+    api
+      .getChartData()
+      .then((raw: ChartPoint[]) => {
+        // "Fluxo Mensal" = receita menos despesa. Como a API não manda
+        // esse total pronto, calculamos aqui antes de passar pro gráfico.
+        const withTotal = raw.map((point) => ({
+          ...point,
+          total: point.income - point.expense,
+        }));
+        setData(withTotal);
+      })
       .catch((err) => console.error("Erro ao carregar dados do gráfico:", err));
   }, []);
 

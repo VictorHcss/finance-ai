@@ -1,35 +1,77 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, Plus } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, Transaction } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
 export function NewTransactionModal() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingDate, setEditingDate] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [type, setType] = useState("income");
   const [category, setCategory] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Qualquer lista (Dashboard, Extrato) pode disparar este evento com
+  // os dados de uma transação existente para abrir o mesmo formulário
+  // em modo de edição, sem precisar duplicar o modal em cada tela.
+  useEffect(() => {
+    function handleOpenForEdit(e: Event) {
+      const transaction = (e as CustomEvent<Transaction>).detail;
+      setEditingId(transaction.id ?? null);
+      setEditingDate(transaction.date);
+      setDescription(transaction.description);
+      setAmount(String(transaction.amount));
+      setType(transaction.type);
+      setCategory(transaction.category);
+      setIsOpen(true);
+    }
+
+    window.addEventListener("open-transaction-modal", handleOpenForEdit);
+    return () => window.removeEventListener("open-transaction-modal", handleOpenForEdit);
+  }, []);
+
+  function openForNew() {
+    setEditingId(null);
+    setDescription("");
+    setAmount("");
+    setCategory("");
+    setType("income");
+    setIsOpen(true);
+  }
+
+  function closeModal() {
+    setIsOpen(false);
+    setEditingId(null);
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
 
-    const newTransaction = {
+    const transactionData = {
       description,
       amount: parseFloat(amount),
       type: type as "income" | "expense",
       category,
-      date: new Date().toISOString(),
+      // Ao editar, mantém a data original da transação (não temos o
+      // valor aqui, então o backend precisa receber a data já existente
+      // — por isso guardamos editingDate junto com o restante do estado).
+      date: editingId ? editingDate : new Date().toISOString(),
     };
 
     try {
-      await api.createTransaction(newTransaction);
-      
-      setIsOpen(false);
+      if (editingId) {
+        await api.updateTransaction(editingId, transactionData);
+      } else {
+        await api.createTransaction(transactionData);
+      }
+
+      closeModal();
       setDescription("");
       setAmount("");
       setCategory("");
@@ -37,7 +79,11 @@ export function NewTransactionModal() {
 
       // Recarrega os dados sem reload total da página se possível
       router.refresh();
-      window.dispatchEvent(new Event("transaction-added"));
+      // Nome genérico: qualquer mudança em transações (criar, editar,
+      // excluir) dispara o mesmo evento, e qualquer tela que dependa
+      // desses dados (resumo do dashboard, insights, extrato) escuta
+      // este único evento para se manter sincronizada.
+      window.dispatchEvent(new Event("transactions-changed"));
     } catch (error) {
       console.error("Erro ao salvar transação:", error);
     } finally {
@@ -48,7 +94,7 @@ export function NewTransactionModal() {
   if (!isOpen) {
     return (
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={openForNew}
         className="fixed bottom-8 right-8 flex items-center gap-2 px-4 py-4 md:px-6 md:py-4 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-semibold shadow-[0_10px_20px_rgba(16,185,129,0.2)] ring-1 ring-white/20 hover:shadow-[0_15px_30px_rgba(16,185,129,0.4)] hover:-translate-y-1 active:scale-95 transition-all duration-300 ease-out group z-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-zinc-950"
         aria-label="Nova Transação"
         title="Nova Transação"
@@ -66,10 +112,12 @@ export function NewTransactionModal() {
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold">Adicionar Transação</h2>
+          <h2 className="text-xl font-bold">
+            {editingId ? "Editar Transação" : "Adicionar Transação"}
+          </h2>
 
           <button
-            onClick={() => setIsOpen(false)}
+            onClick={closeModal}
             className="text-zinc-500 hover:text-zinc-300"
           >
             <X size={20} />
@@ -145,7 +193,7 @@ export function NewTransactionModal() {
             disabled={loading}
             className="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-lg font-bold text-sm transition-colors mt-4 disabled:opacity-50"
           >
-            {loading ? "Salvando..." : "Salvar Transação"}
+            {loading ? "Salvando..." : editingId ? "Salvar Alterações" : "Salvar Transação"}
           </button>
         </form>
       </div>

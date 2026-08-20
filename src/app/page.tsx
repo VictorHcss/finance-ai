@@ -63,6 +63,12 @@ export default function Home() {
 
   useEffect(() => {
     fetchData();
+
+    // Sem isso, os cards de Saldo/Entradas/Saídas e o Insight da IA
+    // ficavam "presos" nos valores de quando a página carregou —
+    // só atualizavam depois de um F5 manual.
+    window.addEventListener("transactions-changed", fetchData);
+    return () => window.removeEventListener("transactions-changed", fetchData);
   }, [fetchData]);
 
   const formatCurrency = (value: number) => {
@@ -110,7 +116,7 @@ export default function Home() {
   };
 
   return (
-    <main className="p-8 space-y-8">
+    <main className="p-4 sm:p-8 space-y-8">
       <header>
         <h1 className="text-2xl font-bold">Dashboard</h1>
 

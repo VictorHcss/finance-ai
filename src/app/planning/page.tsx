@@ -3,11 +3,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { NewGoalModal } from "@/components/NewGoalModal";
 import { GoalCard } from "@/components/GoalCard";
-import { GoalStatus, api } from "@/lib/api";
+import { Goal, api } from "@/lib/api";
 import { Search, CheckCircle2 } from "lucide-react";
 
 export default function PlanningPage() {
-  const [goals, setGoals] = useState<GoalStatus[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
@@ -36,7 +36,7 @@ export default function PlanningPage() {
   });
 
   return (
-    <main className="p-8 min-h-screen bg-black text-white">
+    <main className="p-4 sm:p-8 min-h-screen bg-zinc-950 text-zinc-50">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>

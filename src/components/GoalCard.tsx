@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Target, Calendar, CheckCircle2, Trash2, PlusCircle } from "lucide-react";
+import { Calendar, CheckCircle2, Trash2, PlusCircle } from "lucide-react";
 import { Goal, api } from "@/lib/api";
 import { AddValueModal } from "./AddValueModal";
 
