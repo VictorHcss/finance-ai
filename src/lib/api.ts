@@ -159,7 +159,6 @@ export const api = {
     });
   },
 
-
   // Dashboard
   getSummary: async (): Promise<DashboardSummary> => {
     try {
@@ -195,5 +194,16 @@ export const api = {
 
       return [];
     }
+  },
+
+  // Authentication
+  forgotPassword: async (email: string) => {
+    return await fetchWithTimeout(`${API_URL}/forgot-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email }),
+    });
   },
 };
