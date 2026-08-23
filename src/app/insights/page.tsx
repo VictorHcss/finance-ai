@@ -21,6 +21,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { AppLayout } from "@/components/AppLayout";
 
 export default function InsightsPage() {
   const [data, setData] = useState<InsightData | null>(null);
@@ -58,7 +59,8 @@ export default function InsightsPage() {
 
   if (error) {
     return (
-      <main className="p-8 flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+      <AppLayout>
+      <main className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
         <AlertCircle size={48} className="text-rose-500" />
         <h2 className="text-xl font-bold">Erro ao carregar insights</h2>
         <p className="text-zinc-500">Verifique se o servidor backend está online.</p>
@@ -69,11 +71,13 @@ export default function InsightsPage() {
           Tentar novamente
         </button>
       </main>
+      </AppLayout>
     );
   }
 
   return (
-    <main className="p-4 sm:p-8 space-y-8 animate-in fade-in duration-500">
+    <AppLayout>
+    <main className="space-y-8 animate-in fade-in duration-500">
       {/* Header com Status Dinâmico */}
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -281,5 +285,6 @@ export default function InsightsPage() {
         </div>
       </section>
     </main>
+    </AppLayout>
   );
 }

@@ -3,6 +3,7 @@
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Sidebar } from "@/components/Sidebar";
 import { Navbar } from "@/components/Navbar";
+import { NewTransactionModal } from "@/components/NewTransactionModal";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -16,6 +17,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               {children}
             </div>
           </main>
+          <NewTransactionModal />
         </div>
       </div>
     </ProtectedRoute>

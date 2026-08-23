@@ -39,6 +39,28 @@ export type DashboardSummary = {
   incomes: number;
   expenses: number;
   total: number;
+  balance_trend_percentage: number;
+  expense_ratio: number;
+};
+
+export type ChartDataPoint = {
+  name: string;
+  income: number;
+  expense: number;
+};
+
+export type UserProfile = {
+  id: number;
+  name: string;
+  email: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type AuthSession = {
+  session_token: string;
+  user: UserProfile;
+  expires_at: string;
 };
 
 const fetchWithTimeout = async (
@@ -73,6 +95,41 @@ const fetchWithTimeout = async (
 };
 
 export const api = {
+  request: async <T,>(
+    path: string,
+    options: RequestInit = {},
+    params?: Record<string, unknown>,
+  ): Promise<T> => {
+    let url = `${API_URL}${path}`;
+
+    if (params && options.method === "GET") {
+      const searchParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          searchParams.append(key, String(value));
+        }
+      });
+      const queryString = searchParams.toString();
+      if (queryString) {
+        url += `?${queryString}`;
+      }
+    }
+
+    const requestOptions: RequestInit = {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    };
+
+    if (params && options.method !== "GET") {
+      requestOptions.body = JSON.stringify(params);
+    }
+
+    return await fetchWithTimeout(url, requestOptions);
+  },
+
   // Utility
   resetDatabase: () =>
     fetchWithTimeout(`${API_URL}/reset`, {
@@ -170,6 +227,8 @@ export const api = {
         incomes: 0,
         expenses: 0,
         total: 0,
+        balance_trend_percentage: 0,
+        expense_ratio: 0,
       };
     }
   },
@@ -186,7 +245,7 @@ export const api = {
   },
 
   // Charts
-  getChartData: async () => {
+  getChartData: async (): Promise<ChartDataPoint[]> => {
     try {
       return await fetchWithTimeout(`${API_URL}/chart-data`);
     } catch (e) {
@@ -204,6 +263,42 @@ export const api = {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ email }),
+    });
+  },
+
+  login: async (data: { email: string; password: string }): Promise<AuthSession> => {
+    return await fetchWithTimeout(`${API_URL}/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+  },
+
+  register: async (data: { name: string; email: string; password: string }): Promise<AuthSession> => {
+    return await fetchWithTimeout(`${API_URL}/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+  },
+
+  logout: async (sessionToken: string) => {
+    return await fetchWithTimeout(`${API_URL}/logout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${sessionToken}`,
+      },
+    });
+  },
+
+  getProfile: async (): Promise<UserProfile> => {
+    return await fetchWithTimeout(`${API_URL}/me`, {
+      method: "GET",
     });
   },
 };

@@ -1,8 +1,10 @@
 import { User, Bell, Database } from "lucide-react";
+import { AppLayout } from "@/components/AppLayout";
 
 export default function SettingsPage() {
   return (
-    <main className="p-4 sm:p-8 space-y-8">
+    <AppLayout>
+    <main className="space-y-8">
       <header>
         <h1 className="text-2xl font-bold">Configurações</h1>
         <p className="text-zinc-400 text-sm">
@@ -76,6 +78,7 @@ export default function SettingsPage() {
         </section>
       </div>
     </main>
+    </AppLayout>
   );
 }
 

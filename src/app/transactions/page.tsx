@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ArrowUpCircle, ArrowDownCircle, Search, Trash2, Pencil } from "lucide-react";
 import { api, Transaction } from "@/lib/api";
+import { AppLayout } from "@/components/AppLayout";
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -63,7 +64,8 @@ export default function TransactionsPage() {
   }
 
   return (
-    <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6">
+    <AppLayout>
+      <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
         <div>
           <h1 className="text-3xl font-bold">Extrato</h1>
@@ -174,5 +176,6 @@ export default function TransactionsPage() {
         </div>
       </div>
     </div>
+    </AppLayout>
   );
 }

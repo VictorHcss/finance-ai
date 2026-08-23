@@ -7,6 +7,7 @@ import { ArrowUpRight, ArrowDownRight, DollarSign } from "lucide-react";
 
 import { TransactionList } from "@/components/TransactionList";
 import { api, InsightData } from "@/lib/api";
+import { AppLayout } from "@/components/AppLayout";
 
 const FinanceChart = dynamic(
   () => import("@/components/FinanceChart").then((mod) => mod.FinanceChart),
@@ -116,7 +117,8 @@ export default function Home() {
   };
 
   return (
-    <main className="p-4 sm:p-8 space-y-8">
+    <AppLayout>
+      <main className="space-y-8">
       <header>
         <h1 className="text-2xl font-bold">Dashboard</h1>
 
@@ -205,6 +207,7 @@ export default function Home() {
         </div>
       </section>
     </main>
+    </AppLayout>
   );
 }
 

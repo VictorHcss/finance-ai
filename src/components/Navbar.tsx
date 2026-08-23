@@ -60,14 +60,13 @@ export function Navbar() {
 
   const userInitials = user?.name
     ?.split(" ")
-    .map((n) => n[0])
+    .map((n: string) => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2) || "U";
 
   return (
     <header className="h-14 md:h-16 border-b border-zinc-800/60 bg-zinc-950/70 backdrop-blur-md flex items-center justify-between px-4 sm:px-6 shrink-0 sticky top-0 z-30">
-      {/* Esquerda: Título da página + espaço para botão hambúrguer do mobile */}
       <div className="flex items-center gap-3 md:gap-4 min-w-0">
         <div className="w-9 md:hidden shrink-0" />
         <div className="min-w-0">
@@ -81,8 +80,6 @@ export function Navbar() {
           )}
         </div>
       </div>
-
-      {/* Direita: Mobile mostra sino + perfil (sidebar recolhida). Desktop limpo. */}
       <div className="flex items-center gap-1 md:gap-2">
         <Link
           href="/notifications"
@@ -96,9 +93,7 @@ export function Navbar() {
           />
         </Link>
 
-        {/* Apenas Mobile: Notificações e Perfil (sidebar está como drawer) */}
         <div className="flex items-center gap-1 md:hidden">
-          {/* Notificações Mobile */}
           <Link
             href="/notifications"
             className="p-2 hover:bg-zinc-800/70 rounded-xl transition-all duration-200 text-zinc-400 hover:text-zinc-200 relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-zinc-700"

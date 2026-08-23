@@ -5,6 +5,7 @@ import { NewGoalModal } from "@/components/NewGoalModal";
 import { GoalCard } from "@/components/GoalCard";
 import { Goal, api } from "@/lib/api";
 import { Search, CheckCircle2 } from "lucide-react";
+import { AppLayout } from "@/components/AppLayout";
 
 export default function PlanningPage() {
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -36,7 +37,8 @@ export default function PlanningPage() {
   });
 
   return (
-    <main className="p-4 sm:p-8 min-h-screen bg-zinc-950 text-zinc-50">
+    <AppLayout>
+      <div className="min-h-screen">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
@@ -146,6 +148,7 @@ export default function PlanningPage() {
           </section>
         )}
       </div>
-    </main>
+      </div>
+    </AppLayout>
   );
 }
