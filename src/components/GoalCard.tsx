@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import { Calendar, CheckCircle2, Trash2, PlusCircle } from "lucide-react";
-import { Goal, api } from "@/lib/api";
+import { storage } from "@/lib/storage";
+import type { Goal } from "@/lib/api";
 import { AddValueModal } from "./AddValueModal";
 
 interface GoalCardProps {
@@ -15,7 +16,7 @@ export function GoalCard({ goal, onUpdate }: GoalCardProps) {
 
   async function handleComplete() {
     try {
-      await api.completeGoal(goal.id);
+      await storage.completeGoal(goal.id);
       onUpdate();
     } catch (err) {
       console.error(err);
@@ -25,7 +26,7 @@ export function GoalCard({ goal, onUpdate }: GoalCardProps) {
   async function handleDelete() {
     if (confirm(`Tem certeza que deseja excluir a meta "${goal.goal_name}"?`)) {
       try {
-        await api.deleteGoal(goal.id);
+        await storage.deleteGoal(goal.id);
         onUpdate();
       } catch (err) {
         console.error(err);

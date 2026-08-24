@@ -6,7 +6,8 @@ import dynamic from "next/dynamic";
 import { ArrowUpRight, ArrowDownRight, DollarSign } from "lucide-react";
 
 import { TransactionList } from "@/components/TransactionList";
-import { api, InsightData } from "@/lib/api";
+import { storage } from "@/lib/storage";
+import type { InsightData } from "@/lib/api";
 import { AppLayout } from "@/components/AppLayout";
 
 const FinanceChart = dynamic(
@@ -51,8 +52,8 @@ export default function Home() {
   const fetchData = useCallback(async () => {
     try {
       const [summaryData, insightData] = await Promise.all([
-        api.getSummary(),
-        api.getInsights(),
+        storage.getSummary(),
+        storage.getInsights(),
       ]);
 
       setSummary(summaryData);

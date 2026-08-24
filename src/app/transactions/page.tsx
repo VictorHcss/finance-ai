@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { ArrowUpCircle, ArrowDownCircle, Search, Trash2, Pencil } from "lucide-react";
-import { api, Transaction } from "@/lib/api";
+import { storage } from "@/lib/storage";
+import type { Transaction } from "@/lib/api";
 import { AppLayout } from "@/components/AppLayout";
 
 export default function TransactionsPage() {
@@ -14,7 +15,7 @@ export default function TransactionsPage() {
 
   async function fetchTransactions() {
     try {
-      const data = await api.getTransactions();
+      const data = await storage.getTransactions();
       setTransactions(data);
       setFilteredTransactions(data);
     } catch (error) {
@@ -53,7 +54,7 @@ export default function TransactionsPage() {
 
     setDeletingId(id);
     try {
-      await api.deleteTransaction(id);
+      await storage.deleteTransaction(id);
       window.dispatchEvent(new Event("transactions-changed"));
     } catch (err) {
       console.error("Erro ao excluir transação:", err);

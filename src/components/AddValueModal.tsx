@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { X, DollarSign, Plus } from "lucide-react";
-import { api } from "@/lib/api";
+import { storage } from "@/lib/storage";
 
 interface AddValueModalProps {
   goalId: number;
@@ -21,7 +21,7 @@ export function AddValueModal({ goalId, goalName, isOpen, onClose, onSuccess }: 
 
     setLoading(true);
     try {
-      await api.depositGoal(goalId, parseFloat(amount));
+      await storage.depositGoal(goalId, parseFloat(amount));
       setAmount("");
       onSuccess();
       onClose();

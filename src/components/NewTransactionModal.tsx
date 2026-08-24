@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { X, Plus } from "lucide-react";
-import { api, Transaction } from "@/lib/api";
+import { storage } from "@/lib/storage";
+import type { Transaction } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
 export function NewTransactionModal() {
@@ -66,9 +67,9 @@ export function NewTransactionModal() {
 
     try {
       if (editingId) {
-        await api.updateTransaction(editingId, transactionData);
+        await storage.updateTransaction(editingId, transactionData);
       } else {
-        await api.createTransaction(transactionData);
+        await storage.createTransaction(transactionData);
       }
 
       closeModal();

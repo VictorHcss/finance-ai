@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { X, Target } from "lucide-react";
-import { api } from "@/lib/api";
+import { storage } from "@/lib/storage";
 
 interface NewGoalModalProps {
   onSuccess?: () => void;
@@ -25,7 +25,7 @@ export function NewGoalModal({ onSuccess }: NewGoalModalProps) {
         deadline,
       };
 
-      await api.createGoal(newGoal);
+      await storage.createGoal(newGoal);
       
       setIsOpen(false);
       setName("");

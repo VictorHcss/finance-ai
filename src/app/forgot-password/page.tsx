@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { api } from "@/lib/api";
+import { storage } from "@/lib/storage";
 import { useToast } from "@/contexts/ToastContext";
 import Link from "next/link";
 import { Mail, ArrowLeft, CheckCircle2 } from "lucide-react";
@@ -17,7 +17,7 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      await api.forgotPassword(email);
+      await storage.forgotPassword(email);
       setSent(true);
       addToast("success", "E-mail de recuperação enviado (simulado)!");
     } catch {

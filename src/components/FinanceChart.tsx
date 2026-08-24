@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -10,10 +10,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { api } from "@/lib/api";
+import { storage } from "@/lib/storage";
 
-// O backend devolve, por mês: { name, income, expense } — sem campo "total".
-// Esse tipo documenta isso, então o TypeScript nos avisa se o formato mudar.
 type ChartPoint = {
   name: string;
   income: number;
@@ -23,12 +21,10 @@ type ChartPoint = {
 export function FinanceChart() {
   const [data, setData] = useState<(ChartPoint & { total: number })[]>([]);
 
-  useEffect(() => {
-    api
+  const loadData = useCallback(() => {
+    storage
       .getChartData()
       .then((raw: ChartPoint[]) => {
-        // "Fluxo Mensal" = receita menos despesa. Como a API não manda
-        // esse total pronto, calculamos aqui antes de passar pro gráfico.
         const withTotal = raw.map((point) => ({
           ...point,
           total: point.income - point.expense,
@@ -37,6 +33,12 @@ export function FinanceChart() {
       })
       .catch((err) => console.error("Erro ao carregar dados do gráfico:", err));
   }, []);
+
+  useEffect(() => {
+    loadData();
+    window.addEventListener("transactions-changed", loadData);
+    return () => window.removeEventListener("transactions-changed", loadData);
+  }, [loadData]);
 
   return (
     <div className="min-w-0 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">

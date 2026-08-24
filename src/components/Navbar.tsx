@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Bell, LogOut } from "lucide-react";
+import { Bell, LogOut, Cloud, CloudOff } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import { useToast } from "@/contexts/ToastContext";
 import { NotificationBadge, useNotificationsQuery } from "@/features/notifications";
 import { NotificationStatus } from "@/features/notifications/types";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useStorageMode } from "@/lib/storage";
 
 const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   "/": { title: "Dashboard", subtitle: "Visão geral das suas finanças" },
@@ -25,6 +27,7 @@ export function Navbar() {
   const router = useRouter();
   const { addToast } = useToast();
   const pathname = usePathname();
+  const storageMode = useStorageMode();
   const unreadCountQuery = useNotificationsQuery(
     { status: NotificationStatus.Unread, page: 1, page_size: 1 },
     { toastOnError: false },
@@ -81,6 +84,7 @@ export function Navbar() {
         </div>
       </div>
       <div className="flex items-center gap-1 md:gap-2">
+        <StorageModeBadge mode={storageMode} />
         <Link
           href="/notifications"
           className="hidden md:inline-flex items-center justify-center p-2 hover:bg-zinc-800/70 rounded-xl transition-all duration-200 text-zinc-400 hover:text-zinc-200 relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-zinc-700"
@@ -143,5 +147,78 @@ export function Navbar() {
         </div>
       </div>
     </header>
+  );
+}
+
+function StorageModeBadge({ mode }: { mode: "api" | "local" | null }) {
+  if (!mode) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-900/60 border border-zinc-800 animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
+            <span className="text-[10px] font-medium text-zinc-500 tracking-wide">
+              ...
+            </span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" align="end" className="bg-zinc-900 border-zinc-800 text-zinc-300">
+          Verificando conexão...
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  const isApi = mode === "api";
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-900/60 border border-zinc-800 hover:bg-zinc-900 transition-colors cursor-default">
+          {isApi ? (
+            <Cloud size={12} className="text-emerald-500 shrink-0" />
+          ) : (
+            <CloudOff size={12} className="text-amber-500 shrink-0" />
+          )}
+          <span
+            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+              isApi ? "bg-emerald-500" : "bg-amber-500"
+            }`}
+          />
+          <span
+            className={`text-[10px] font-medium tracking-wide hidden sm:inline ${
+              isApi ? "text-emerald-400" : "text-amber-400"
+            }`}
+          >
+            {isApi ? "Conectado" : "Modo local"}
+          </span>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent
+        side="bottom"
+        align="end"
+        className="bg-zinc-900 border-zinc-800 text-zinc-300 max-w-[260px]"
+      >
+        {isApi ? (
+          <>
+            <p className="font-semibold text-emerald-400 mb-1">
+              ● Conectado ao servidor
+            </p>
+            <p className="text-zinc-400 text-[11px] leading-relaxed">
+              Seus dados estão sendo salvos no banco de dados via API.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="font-semibold text-amber-400 mb-1">
+              ● Modo local (offline)
+            </p>
+            <p className="text-zinc-400 text-[11px] leading-relaxed">
+              API indisponível. Os dados serão salvos apenas neste navegador (localStorage).
+            </p>
+          </>
+        )}
+      </TooltipContent>
+    </Tooltip>
   );
 }

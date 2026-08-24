@@ -8,7 +8,8 @@ import {
   ReactNode,
   useEffect,
 } from "react";
-import { api, AuthSession, UserProfile } from "@/lib/api";
+import { storage } from "@/lib/storage";
+import type { AuthSession, UserProfile } from "@/lib/api";
 
 interface AuthContextType {
   session: AuthSession | null;
@@ -58,14 +59,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Update fetchWithTimeout to include auth token
   const login = useCallback(async (email: string, password: string) => {
-    const response = await api.login({ email, password });
+    const response = await storage.login({ email, password });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(response));
     setSession(response);
     setUser(response.user);
   }, []);
 
   const register = useCallback(async (name: string, email: string, password: string) => {
-    const response = await api.register({ name, email, password });
+    const response = await storage.register({ name, email, password });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(response));
     setSession(response);
     setUser(response.user);
@@ -74,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     if (session) {
       try {
-        await api.logout(session.session_token);
+        await storage.logout(session.session_token);
       } catch (error) {
         console.error("Error during logout:", error);
       }
@@ -86,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     if (session) {
-      const profile = await api.getProfile();
+      const profile = await storage.getProfile();
       setUser(profile);
       // Update session with new user data
       const updatedSession = { ...session, user: profile };

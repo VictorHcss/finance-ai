@@ -11,7 +11,8 @@ import {
   TrendingDown,
   Info,
 } from "lucide-react";
-import { api, InsightData } from "@/lib/api";
+import { storage } from "@/lib/storage";
+import type { InsightData } from "@/lib/api";
 import {
   AreaChart,
   Area,
@@ -32,7 +33,7 @@ export default function InsightsPage() {
     try {
       setLoading(true);
       setError(false);
-      const json = await api.getInsights();
+      const json = await storage.getInsights();
       if (json) {
         setData(json);
       } else {

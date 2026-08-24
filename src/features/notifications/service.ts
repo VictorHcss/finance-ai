@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { storageNotificationsService } from "@/lib/storage";
 import {
   type ListNotificationsRequest,
   type ListNotificationsResponse,
@@ -11,28 +11,17 @@ export const notificationsService = {
   list: async (
     params: ListNotificationsRequest,
   ): Promise<ListNotificationsResponse> => {
-    return await api.request<ListNotificationsResponse>(
-      "/notifications",
-      { method: "GET" },
-      params,
-    );
+    return await storageNotificationsService.list(params);
   },
 
   markAsRead: async (id: number): Promise<MarkNotificationAsReadResponse> => {
-    return await api.request<MarkNotificationAsReadResponse>(
-      `/notifications/${id}/read`,
-      { method: "POST" },
-    );
+    return await storageNotificationsService.markAsRead(id);
   },
 
   markAllAsRead: async (
     params: MarkAllNotificationsAsReadRequest,
   ): Promise<MarkAllNotificationsAsReadResponse> => {
-    return await api.request<MarkAllNotificationsAsReadResponse>(
-      "/notifications/read-all",
-      { method: "POST" },
-      params,
-    );
+    return await storageNotificationsService.markAllAsRead(params);
   },
 };
 

@@ -63,6 +63,54 @@ export type AuthSession = {
   expires_at: string;
 };
 
+export type HttpErrorKind =
+  | "network_unavailable"
+  | "timeout"
+  | "http_4xx"
+  | "http_5xx"
+  | "unknown";
+
+export class HttpError extends Error {
+  readonly kind: HttpErrorKind;
+  readonly status?: number;
+  readonly responseBody?: unknown;
+
+  constructor(
+    message: string,
+    kind: HttpErrorKind,
+    status?: number,
+    responseBody?: unknown,
+  ) {
+    super(message);
+    this.name = "HttpError";
+    this.kind = kind;
+    this.status = status;
+    this.responseBody = responseBody;
+  }
+}
+
+export function isBackendUnavailableError(error: unknown): boolean {
+  if (!(error instanceof HttpError)) {
+    if (error instanceof TypeError && error.message === "Failed to fetch") {
+      return true;
+    }
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return true;
+    }
+    return false;
+  }
+  return (
+    error.kind === "network_unavailable" ||
+    error.kind === "timeout" ||
+    error.kind === "http_5xx"
+  );
+}
+
+export function isAuthOrValidationError(error: unknown): boolean {
+  if (!(error instanceof HttpError)) return false;
+  return error.kind === "http_4xx";
+}
+
 const fetchWithTimeout = async (
   url: string,
   options: RequestInit = {},
@@ -81,7 +129,22 @@ const fetchWithTimeout = async (
     clearTimeout(id);
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      let responseBody: unknown = undefined;
+      try {
+        responseBody = await response.json();
+      } catch {
+        // ignore parse errors for error bodies
+      }
+
+      const kind: HttpErrorKind =
+        response.status >= 500 ? "http_5xx" : "http_4xx";
+
+      throw new HttpError(
+        `HTTP error! status: ${response.status}`,
+        kind,
+        response.status,
+        responseBody,
+      );
     }
 
     return await response.json();
@@ -90,7 +153,32 @@ const fetchWithTimeout = async (
 
     console.error(`Fetch error on ${url}:`, error);
 
-    throw error;
+    if (error instanceof HttpError) throw error;
+
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new HttpError(
+        `Request timed out: ${url}`,
+        "timeout",
+        undefined,
+        undefined,
+      );
+    }
+
+    if (error instanceof TypeError && error.message === "Failed to fetch") {
+      throw new HttpError(
+        `Backend unavailable: ${url}`,
+        "network_unavailable",
+        undefined,
+        undefined,
+      );
+    }
+
+    throw new HttpError(
+      error instanceof Error ? error.message : "Unknown fetch error",
+      "unknown",
+      undefined,
+      undefined,
+    );
   }
 };
 
@@ -257,7 +345,7 @@ export const api = {
 
   // Authentication
   forgotPassword: async (email: string) => {
-    return await fetchWithTimeout(`${API_URL}/forgot-password`, {
+    return await fetchWithTimeout(`${API_URL}/auth/forgot-password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -267,7 +355,7 @@ export const api = {
   },
 
   login: async (data: { email: string; password: string }): Promise<AuthSession> => {
-    return await fetchWithTimeout(`${API_URL}/login`, {
+    return await fetchWithTimeout(`${API_URL}/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -277,7 +365,7 @@ export const api = {
   },
 
   register: async (data: { name: string; email: string; password: string }): Promise<AuthSession> => {
-    return await fetchWithTimeout(`${API_URL}/register`, {
+    return await fetchWithTimeout(`${API_URL}/auth/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -287,7 +375,7 @@ export const api = {
   },
 
   logout: async (sessionToken: string) => {
-    return await fetchWithTimeout(`${API_URL}/logout`, {
+    return await fetchWithTimeout(`${API_URL}/auth/logout`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -297,7 +385,7 @@ export const api = {
   },
 
   getProfile: async (): Promise<UserProfile> => {
-    return await fetchWithTimeout(`${API_URL}/me`, {
+    return await fetchWithTimeout(`${API_URL}/auth/profile`, {
       method: "GET",
     });
   },

@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { NewGoalModal } from "@/components/NewGoalModal";
 import { GoalCard } from "@/components/GoalCard";
-import { Goal, api } from "@/lib/api";
+import { storage } from "@/lib/storage";
+import type { Goal } from "@/lib/api";
 import { Search, CheckCircle2 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 
@@ -16,7 +17,7 @@ export default function PlanningPage() {
   const loadGoals = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await api.getGoalsStatus();
+      const data = await storage.getGoalsStatus();
       setGoals(data);
     } catch (err) {
       console.error("Erro ao carregar metas:", err);

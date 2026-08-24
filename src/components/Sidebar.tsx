@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
@@ -20,10 +21,6 @@ const menuItems = [
   { icon: BrainCircuit, label: "Insights IA", href: "/insights" },
   { icon: Settings, label: "Configurações", href: "/settings" },
 ];
-
-// Nome do usuário centralizado aqui — quando existir autenticação de
-// verdade, isso vem da sessão em vez de ser fixo no componente.
-const CURRENT_USER = "Victor H.";
 
 function getInitials(name: string) {
   return name
@@ -45,9 +42,13 @@ function isRouteActive(pathname: string, href: string) {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   const closeMenu = () => setIsOpen(false);
+
+  const displayName = user?.name ?? "Usuário";
+  const initials = getInitials(displayName);
 
   return (
     <>
@@ -115,11 +116,11 @@ export function Sidebar() {
         </nav>
 
         <div className="p-4 border-t border-zinc-800">
-          <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-emerald-500">
-              {getInitials(CURRENT_USER)}
+          <div className="flex items-center gap-3 px-2 min-w-0">
+            <div className="w-8 h-8 shrink-0 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-xs font-bold text-white shadow-sm shadow-emerald-500/20 ring-1 ring-white/10">
+              {initials}
             </div>
-            <span className="text-sm font-medium text-zinc-300">{CURRENT_USER}</span>
+            <span className="text-sm font-medium text-zinc-300 truncate">{displayName}</span>
           </div>
         </div>
       </aside>

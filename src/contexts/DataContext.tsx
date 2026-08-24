@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
-import {
-  api,
+import { storage } from "@/lib/storage";
+import type {
   ChartDataPoint,
   DashboardSummary,
   Goal,
@@ -51,27 +51,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const fetchTransactions = useCallback(async () => {
-    const data = await api.getTransactions();
+    const data = await storage.getTransactions();
     setTransactions(data);
   }, []);
 
   const fetchGoals = useCallback(async () => {
-    const data = await api.getGoalsStatus();
+    const data = await storage.getGoalsStatus();
     setGoals(data);
   }, []);
 
   const fetchSummary = useCallback(async () => {
-    const data = await api.getSummary();
+    const data = await storage.getSummary();
     setSummary(data);
   }, []);
 
   const fetchInsights = useCallback(async () => {
-    const data = await api.getInsights();
+    const data = await storage.getInsights();
     setInsights(data);
   }, []);
 
   const fetchChartData = useCallback(async () => {
-    const data = await api.getChartData();
+    const data = await storage.getChartData();
     setChartData(data);
   }, []);
 
