@@ -331,4 +331,88 @@ def init_db() -> None:
             (1, now, now),
         )
 
+        # Povoa a conta demo com dados de exemplo, só na primeira vez
+        # (se ela já tiver transações, não duplica a cada reinício do
+        # servidor). Sem isso, "demo@finance.ai" logava num dashboard
+        # completamente vazio — o que não mostra nada de útil para
+        # quem está conhecendo o produto.
+        has_demo_data = cursor.execute(
+            "SELECT COUNT(*) FROM transactions WHERE user_id = 1"
+        ).fetchone()[0]
+
+        if not has_demo_data:
+            demo_transactions = [
+                # Mês anterior — existe só para permitir o cálculo real
+                # de tendência (comparação mês atual vs mês anterior).
+                ("Salário", 6200.00, "income", "Salário", "2026-07-01"),
+                ("Aluguel", 1800.00, "expense", "Moradia", "2026-07-02"),
+                ("Supermercado", 540.00, "expense", "Alimentação", "2026-07-06"),
+                ("Internet", 119.90, "expense", "Moradia", "2026-07-18"),
+                # Mês atual
+                ("Salário", 6500.00, "income", "Salário", "2026-08-01"),
+                ("Aluguel", 1800.00, "expense", "Moradia", "2026-08-02"),
+                ("Supermercado", 620.50, "expense", "Alimentação", "2026-08-04"),
+                ("Assinatura Streaming", 39.90, "expense", "Lazer", "2026-08-05"),
+                ("Freelance — Projeto Web", 1200.00, "income", "Renda Extra", "2026-08-08"),
+                ("Combustível", 280.00, "expense", "Transporte", "2026-08-10"),
+                ("Academia", 99.90, "expense", "Saúde", "2026-08-10"),
+                ("Restaurante", 145.00, "expense", "Alimentação", "2026-08-14"),
+                ("Farmácia", 87.30, "expense", "Saúde", "2026-08-16"),
+                ("Internet", 119.90, "expense", "Moradia", "2026-08-18"),
+            ]
+            for description, amount, tx_type, category, date in demo_transactions:
+                cursor.execute(
+                    """
+                    INSERT INTO transactions (
+                        user_id, description, amount, type, category, date, created_at, updated_at
+                    )
+                    VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (description, amount, tx_type, category, date, now, now),
+                )
+
+            demo_goals = [
+                ("Reserva de Emergência", 15000.00, 6400.00, "2027-01-31"),
+                ("Viagem para o Nordeste", 4000.00, 1250.00, "2026-12-15"),
+            ]
+            for name, target, current, deadline in demo_goals:
+                cursor.execute(
+                    """
+                    INSERT INTO goals (
+                        user_id, name, target_amount, current_amount, deadline,
+                        completed, created_at, updated_at
+                    )
+                    VALUES (1, ?, ?, ?, ?, 0, ?, ?)
+                    """,
+                    (name, target, current, deadline, now, now),
+                )
+
+            demo_notifications = [
+                (
+                    "financeiro", "high",
+                    "Gasto acima da média em Alimentação",
+                    "Você já gastou R$ 765,50 em Alimentação este mês, 18% a mais que sua média dos últimos 3 meses.",
+                ),
+                (
+                    "ia", "normal",
+                    "Novo insight disponível",
+                    "Analisamos seus hábitos recentes e geramos uma nova projeção de gastos para o próximo mês.",
+                ),
+                (
+                    "lembretes", "low",
+                    "Meta 'Viagem para o Nordeste' em andamento",
+                    "Você já guardou 31% do valor necessário. Continue assim!",
+                ),
+            ]
+            for category, priority, title, description in demo_notifications:
+                cursor.execute(
+                    """
+                    INSERT INTO notifications (
+                        user_id, category, priority, title, description, created_at, updated_at
+                    )
+                    VALUES (1, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (category, priority, title, description, now, now),
+                )
+
         conn.commit()

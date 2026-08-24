@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowUpCircle, ArrowDownCircle, Search, Trash2, Pencil } from "lucide-react";
 import { storage } from "@/lib/storage";
 import type { Transaction } from "@/lib/api";
 import { AppLayout } from "@/components/AppLayout";
+import { useHandleFetchError } from "@/hooks/useHandleFetchError";
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -12,18 +13,19 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const handleFetchError = useHandleFetchError();
 
-  async function fetchTransactions() {
+  const fetchTransactions = useCallback(async () => {
     try {
       const data = await storage.getTransactions();
       setTransactions(data);
       setFilteredTransactions(data);
     } catch (error) {
-      console.error("Erro ao carregar transações:", error);
+      await handleFetchError(error, "Erro ao carregar transações:");
     } finally {
       setLoading(false);
     }
-  }
+  }, [handleFetchError]);
 
   useEffect(() => {
     fetchTransactions();
@@ -34,7 +36,7 @@ export default function TransactionsPage() {
     // transação depois de recarregar a página manualmente.
     window.addEventListener("transactions-changed", fetchTransactions);
     return () => window.removeEventListener("transactions-changed", fetchTransactions);
-  }, []);
+  }, [fetchTransactions]);
 
   useEffect(() => {
     const filtered = transactions.filter((t) =>
@@ -57,8 +59,7 @@ export default function TransactionsPage() {
       await storage.deleteTransaction(id);
       window.dispatchEvent(new Event("transactions-changed"));
     } catch (err) {
-      console.error("Erro ao excluir transação:", err);
-      alert("Não foi possível excluir a transação. Tente novamente.");
+      await handleFetchError(err, "Erro ao excluir transação:");
     } finally {
       setDeletingId(null);
     }

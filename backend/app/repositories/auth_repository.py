@@ -59,6 +59,37 @@ class AuthRepository:
             )
             conn.commit()
 
+    def update_profile(self, user_id: int, name: Optional[str], email: Optional[str]) -> dict:
+        now = datetime.now(timezone.utc).isoformat()
+        fields = []
+        values: list = []
+        if name is not None:
+            fields.append("name = ?")
+            values.append(name)
+        if email is not None:
+            fields.append("email = ?")
+            values.append(email)
+        fields.append("updated_at = ?")
+        values.append(now)
+        values.append(user_id)
+
+        with get_connection() as conn:
+            conn.execute(
+                f"UPDATE users SET {', '.join(fields)} WHERE id = ?",
+                tuple(values),
+            )
+            conn.commit()
+        return self.get_user_by_id(user_id)
+
+    def delete_user(self, user_id: int) -> None:
+        # PRAGMA foreign_keys = ON + ON DELETE CASCADE em todas as
+        # tabelas relacionadas (sessions, settings, transactions,
+        # goals, notifications, ai_insights, audit_logs) já cuidam de
+        # apagar todos os dados do usuário junto com ele.
+        with get_connection() as conn:
+            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            conn.commit()
+
     def create_session(self, user_id: int, token: str, expires_at: str) -> None:
         now = datetime.now(timezone.utc).isoformat()
         with get_connection() as conn:

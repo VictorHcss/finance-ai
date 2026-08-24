@@ -22,6 +22,15 @@ def list_transactions(user_id: int = Depends(get_current_user_id)) -> list[dict]
     return service.list_transactions(user_id)
 
 
+@router.put("/{transaction_id}")
+def update_transaction(
+    transaction_id: int,
+    transaction: TransactionCreate,
+    user_id: int = Depends(get_current_user_id),
+) -> dict:
+    return service.update_transaction(user_id, transaction_id, transaction.model_dump())
+
+
 @router.delete("/{transaction_id}")
 def delete_transaction(transaction_id: int, user_id: int = Depends(get_current_user_id)) -> dict:
     return service.delete_transaction(user_id, transaction_id)

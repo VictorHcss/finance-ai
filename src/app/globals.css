@@ -2,9 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
+/* O app é escuro por padrão em todas as telas (o body força
+   bg-zinc-950/text-zinc-50 sempre), então os tokens abaixo seguem
+   essa mesma paleta para os componentes de src/components/ui ficarem
+   visualmente consistentes com o resto do app, em vez de usar as
+   cores padrão do shadcn/ui que nunca foram definidas aqui. */
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  --border: #27272a;      /* zinc-800 */
+  --ring: #10b981;         /* emerald-500 */
+
+  --card: #18181b;         /* zinc-900 */
+  --card-foreground: #ededed;
+
+  --muted: #27272a;         /* zinc-800 */
+  --muted-foreground: #a1a1aa; /* zinc-400 */
+
+  --primary: #10b981;        /* emerald-500 */
+  --primary-foreground: #ffffff;
+
+  --destructive: #f43f5e;     /* rose-500 */
+  --destructive-foreground: #ffffff;
+
+  --radius: 0.625rem;
 }
 
 @media (prefers-color-scheme: dark) {

@@ -6,6 +6,7 @@ from app.schemas.auth import (
     ForgotPasswordRequest,
     LoginRequest,
     RegisterRequest,
+    UpdateProfileRequest,
     UserProfileResponse,
 )
 from app.services.auth_service import AuthService
@@ -39,3 +40,16 @@ def forgot_password(payload: ForgotPasswordRequest) -> dict:
 @router.get("/profile", response_model=UserProfileResponse)
 def profile(user_id: int = Depends(get_current_user_id)) -> dict:
     return service.get_profile(user_id)
+
+
+@router.put("/profile", response_model=UserProfileResponse)
+def update_profile(
+    payload: UpdateProfileRequest,
+    user_id: int = Depends(get_current_user_id),
+) -> dict:
+    return service.update_profile(user_id, payload.name, payload.email)
+
+
+@router.delete("/account")
+def delete_account(user_id: int = Depends(get_current_user_id)) -> dict:
+    return service.delete_account(user_id)

@@ -12,6 +12,7 @@ from app.routers.goals import router as goals_router
 from app.routers.health import router as health_router
 from app.routers.insights import router as insights_router
 from app.routers.notifications import router as notifications_router
+from app.routers.settings import router as settings_router
 from app.routers.transactions import router as transactions_router
 from app.services.audit_service import register_audit_event_handler
 
@@ -28,8 +29,8 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=get_allowed_origins(),
         allow_credentials=True,
-        allow_methods=["GET", "POST", "DELETE"],
-        allow_headers=["Authorization", "Content-Type", "X-User-Id"],
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
     init_db()
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_router)
     app.include_router(insights_router)
     app.include_router(notifications_router)
+    app.include_router(settings_router)
     return app
 
 

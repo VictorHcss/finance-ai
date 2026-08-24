@@ -12,6 +12,7 @@ import {
   type InsightData,
   type Transaction,
   type UserProfile,
+  type UserSettings,
 } from "./api";
 import {
   localStorageApi,
@@ -230,6 +231,30 @@ export const storage = {
     fallbackRead(
       () => api.getProfile(),
       () => localStorageApi.getProfile(),
+    ),
+
+  updateProfile: async (data: { name?: string; email?: string }): Promise<UserProfile> =>
+    resolveWrite(
+      () => api.updateProfile(data),
+      () => localStorageApi.updateProfile(data),
+    ),
+
+  deleteAccount: async (): Promise<void> =>
+    resolveWrite(
+      () => api.deleteAccount(),
+      () => localStorageApi.deleteAccount(),
+    ),
+
+  getSettings: async (): Promise<UserSettings> =>
+    fallbackRead(
+      () => api.getSettings(),
+      () => localStorageApi.getSettings(),
+    ),
+
+  updateSettings: async (data: Partial<UserSettings>): Promise<UserSettings> =>
+    resolveWrite(
+      () => api.updateSettings(data),
+      () => localStorageApi.updateSettings(data),
     ),
 
   // --- Transactions ---

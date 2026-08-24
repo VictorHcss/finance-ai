@@ -1,21 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, Plus } from "lucide-react";
 import { storage } from "@/lib/storage";
 import type { Transaction } from "@/lib/api";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/contexts/ToastContext";
+import { useHandleFetchError } from "@/hooks/useHandleFetchError";
+
+function todayDateInputValue() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export function NewTransactionModal() {
   const router = useRouter();
+  const { addToast } = useToast();
+  const handleFetchError = useHandleFetchError();
+
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editingDate, setEditingDate] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [type, setType] = useState("income");
   const [category, setCategory] = useState("");
+  const [date, setDate] = useState(todayDateInputValue());
   const [loading, setLoading] = useState(false);
+
+  const descriptionInputRef = useRef<HTMLInputElement>(null);
 
   // Qualquer lista (Dashboard, Extrato) pode disparar este evento com
   // os dados de uma transação existente para abrir o mesmo formulário
@@ -24,11 +35,11 @@ export function NewTransactionModal() {
     function handleOpenForEdit(e: Event) {
       const transaction = (e as CustomEvent<Transaction>).detail;
       setEditingId(transaction.id ?? null);
-      setEditingDate(transaction.date);
       setDescription(transaction.description);
       setAmount(String(transaction.amount));
       setType(transaction.type);
       setCategory(transaction.category);
+      setDate(transaction.date ? transaction.date.slice(0, 10) : todayDateInputValue());
       setIsOpen(true);
     }
 
@@ -36,12 +47,32 @@ export function NewTransactionModal() {
     return () => window.removeEventListener("open-transaction-modal", handleOpenForEdit);
   }, []);
 
+  // Fecha com Esc, e foca o primeiro campo assim que o modal abre —
+  // sem isso, quem usa teclado/leitor de tela cai direto no formulário
+  // sem saber onde o foco está.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timer = setTimeout(() => descriptionInputRef.current?.focus(), 50);
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") closeModal();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
   function openForNew() {
     setEditingId(null);
     setDescription("");
     setAmount("");
     setCategory("");
     setType("income");
+    setDate(todayDateInputValue());
     setIsOpen(true);
   }
 
@@ -52,24 +83,30 @@ export function NewTransactionModal() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+
+    const parsedAmount = parseFloat(amount);
+    if (!parsedAmount || parsedAmount <= 0) {
+      addToast("error", "Informe um valor maior que zero.");
+      return;
+    }
+
     setLoading(true);
 
     const transactionData = {
       description,
-      amount: parseFloat(amount),
+      amount: parsedAmount,
       type: type as "income" | "expense",
       category,
-      // Ao editar, mantém a data original da transação (não temos o
-      // valor aqui, então o backend precisa receber a data já existente
-      // — por isso guardamos editingDate junto com o restante do estado).
-      date: editingId ? editingDate : new Date().toISOString(),
+      date,
     };
 
     try {
       if (editingId) {
         await storage.updateTransaction(editingId, transactionData);
+        addToast("success", "Transação atualizada!");
       } else {
         await storage.createTransaction(transactionData);
+        addToast("success", "Transação adicionada!");
       }
 
       closeModal();
@@ -77,6 +114,7 @@ export function NewTransactionModal() {
       setAmount("");
       setCategory("");
       setType("income");
+      setDate(todayDateInputValue());
 
       // Recarrega os dados sem reload total da página se possível
       router.refresh();
@@ -86,7 +124,7 @@ export function NewTransactionModal() {
       // este único evento para se manter sincronizada.
       window.dispatchEvent(new Event("transactions-changed"));
     } catch (error) {
-      console.error("Erro ao salvar transação:", error);
+      await handleFetchError(error, "Erro ao salvar transação:");
     } finally {
       setLoading(false);
     }
@@ -97,8 +135,8 @@ export function NewTransactionModal() {
       <button
         onClick={openForNew}
         className="fixed bottom-8 right-8 flex items-center gap-2 px-4 py-4 md:px-6 md:py-4 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-semibold shadow-[0_10px_20px_rgba(16,185,129,0.2)] ring-1 ring-white/20 hover:shadow-[0_15px_30px_rgba(16,185,129,0.4)] hover:-translate-y-1 active:scale-95 transition-all duration-300 ease-out group z-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-zinc-950"
-        aria-label="Nova Transação"
-        title="Nova Transação"
+        aria-label="Nova transação"
+        title="Nova transação"
       >
         <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300" />
 
@@ -110,15 +148,27 @@ export function NewTransactionModal() {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onMouseDown={(e) => {
+        // Fecha ao clicar fora da caixa do modal (no overlay escuro)
+        if (e.target === e.currentTarget) closeModal();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="transaction-modal-title"
+        className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-2xl p-6 shadow-2xl"
+      >
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold">
+          <h2 id="transaction-modal-title" className="text-xl font-bold">
             {editingId ? "Editar Transação" : "Adicionar Transação"}
           </h2>
 
           <button
             onClick={closeModal}
+            aria-label="Fechar"
             className="text-zinc-500 hover:text-zinc-300"
           >
             <X size={20} />
@@ -127,43 +177,54 @@ export function NewTransactionModal() {
 
         <form className="space-y-4" onSubmit={handleSave}>
           <div>
-            <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">
+            <label htmlFor="tx-description" className="text-xs text-zinc-500 uppercase font-bold mb-1 block">
               Descrição
             </label>
 
             <input
+              ref={descriptionInputRef}
+              id="tx-description"
               type="text"
               placeholder="Ex: Salário, Netflix..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 transition-all"
               required
+              maxLength={120}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">
+              <label htmlFor="tx-amount" className="text-xs text-zinc-500 uppercase font-bold mb-1 block">
                 Valor
               </label>
 
-              <input
-                type="number"
-                step="0.01"
-                placeholder="R$ 0,00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 transition-all"
-                required
-              />
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 pointer-events-none">
+                  R$
+                </span>
+                <input
+                  id="tx-amount"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="0,00"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 pl-9 text-sm focus:outline-none focus:border-emerald-500 transition-all"
+                  required
+                />
+              </div>
             </div>
 
             <div>
-              <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">
+              <label htmlFor="tx-type" className="text-xs text-zinc-500 uppercase font-bold mb-1 block">
                 Tipo
               </label>
 
               <select
+                id="tx-type"
                 value={type}
                 onChange={(e) => setType(e.target.value)}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 transition-all"
@@ -174,19 +235,39 @@ export function NewTransactionModal() {
             </div>
           </div>
 
-          <div>
-            <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">
-              Categoria
-            </label>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="tx-category" className="text-xs text-zinc-500 uppercase font-bold mb-1 block">
+                Categoria
+              </label>
 
-            <input
-              type="text"
-              placeholder="Ex: Lazer, Despesas Fixas..."
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 transition-all"
-              required
-            />
+              <input
+                id="tx-category"
+                type="text"
+                placeholder="Ex: Lazer, Moradia..."
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 transition-all"
+                required
+                maxLength={60}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="tx-date" className="text-xs text-zinc-500 uppercase font-bold mb-1 block">
+                Data
+              </label>
+
+              <input
+                id="tx-date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                max={todayDateInputValue()}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 transition-all [color-scheme:dark]"
+                required
+              />
+            </div>
           </div>
 
           <button

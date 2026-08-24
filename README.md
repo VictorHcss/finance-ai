@@ -1,36 +1,100 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Finance.AI
 
-## Getting Started
+Controle financeiro pessoal com dashboard, metas, transações e insights gerados a partir do histórico real de cada conta.
 
-First, run the development server:
+Landing pública em `/`, app autenticado a partir de `/dashboard`. Funciona com backend real (FastAPI + SQLite) ou em modo local (`localStorage`) quando o backend está indisponível.
+
+## Stack
+
+**Frontend** — Next.js 15 (App Router) · React 18 · TypeScript · Tailwind CSS · React Query · Recharts · Radix UI
+
+**Backend** — FastAPI · SQLite (via `sqlite3` nativo, sem ORM) · PBKDF2 para senha · sessões por token opaco
+
+## Rodando localmente
+
+### 1. Backend
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd backend
+pip install fastapi uvicorn --break-system-packages   # ou num virtualenv
+uvicorn app.main:app --reload
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Sobe em `http://localhost:8000`. Na primeira execução, o banco `finance.db` é criado automaticamente com uma **conta de demonstração populada**:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+E-mail: demo@finance.ai
+Senha:  demo123456
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 2. Frontend
 
-## Learn More
+```bash
+npm install
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Sobe em `http://localhost:3000`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 3. Os dois juntos
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev:all
+```
 
-## Deploy on Vercel
+## Variáveis de ambiente
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Variável | Onde | Padrão | Descrição |
+|---|---|---|---|
+| `NEXT_PUBLIC_API_URL` | frontend | `http://localhost:8000/api` | URL base da API |
+| `ALLOWED_ORIGINS` | backend | `http://localhost:3000` | Origens liberadas no CORS (separadas por vírgula) |
+| `SECRET_KEY` / `JWT_SECRET` | backend | valor de desenvolvimento | **Trocar obrigatoriamente em produção** |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | backend | `60` | Usado no payload informativo de JWT (ver nota em `docs/ARQUITETURA.md`) |
+| `DATABASE_URL` | backend | `sqlite:///./finance.db` | Caminho do banco |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Modo local (sem backend)
+
+Se o backend estiver fora do ar, o frontend detecta automaticamente (`checkBackendAvailability()` em `src/lib/storage.ts`) e passa a usar `localStorage` para tudo — login, transações, metas, notificações. É útil para demonstração offline, mas **os dois modos não sincronizam entre si**: dados criados em modo local não aparecem depois quando o backend voltar, e vice-versa.
+
+## Estrutura
+
+```
+backend/
+  app/
+    core/          → config, conexão com banco, segurança (hash de senha), RBAC
+    repositories/   → acesso direto ao SQLite, sempre filtrado por user_id
+    services/       → regra de negócio (cada repositório tem um serviço correspondente)
+    routers/        → endpoints HTTP, um arquivo por domínio
+    schemas/        → modelos Pydantic de request/response
+    dependencies.py → identifica o usuário autenticado a partir do token de sessão
+    main.py         → monta o app, CORS, registra routers
+
+src/
+  app/              → páginas (App Router) — uma pasta por rota
+  components/       → componentes de UI compartilhados
+  components/ui/    → biblioteca de componentes primitivos (Button, Dialog, Tabs...)
+  features/notifications/ → módulo isolado de notificações (hooks, tipos, serviço)
+  contexts/         → AuthContext, DataContext, ToastContext
+  hooks/            → hooks compartilhados (ex: useHandleFetchError)
+  lib/
+    api.ts          → chamadas HTTP reais ao backend
+    localStorage.ts → implementação equivalente em modo local
+    storage.ts       → decide qual das duas usar, com fallback automático
+```
+
+## Funcionalidades
+
+- Cadastro, login, logout, recuperação de senha (fluxo de e-mail ainda não implementado — ver `docs/IDEIAS.md`)
+- Edição de perfil e troca de senha reais
+- Transações: criar, editar, excluir, listar
+- Metas: criar, depositar, concluir, excluir, com percentual de progresso
+- Dashboard com saldo, entradas, saídas e tendência mês a mês de cada um (calculados separadamente — antes um bug fazia o card de Entradas mostrar a variação de Saídas por engano)
+- Insights gerados a partir do histórico real: categoria de gasto dominante, despesas recorrentes detectadas automaticamente, pressão de fluxo de caixa, tendência de receita, projeção de tempo até concluir a próxima meta
+- Notificações (lista, filtros, marcar como lida/todas como lidas)
+- Isolamento real de dados por conta — testado explicitamente com duas contas simultâneas
+
+## Documentação adicional
+
+- [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) — como a autenticação funciona, fluxo de dados, decisões de design
+- [`docs/IDEIAS.md`](docs/IDEIAS.md) — próximas implementações sugeridas, por prioridade
+- [`docs/SEGURANCA.md`](docs/SEGURANCA.md) — o que já foi corrigido, o que ainda precisa de atenção antes de produção

@@ -36,6 +36,11 @@ class ForgotPasswordRequest(BaseModel):
         return sanitize_text(value).lower()
 
 
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=2, max_length=80)
+    email: Optional[str] = Field(default=None, min_length=5, max_length=120)
+
+
 class UserProfileResponse(BaseModel):
     id: int
     name: str

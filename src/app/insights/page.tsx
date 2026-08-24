@@ -12,7 +12,7 @@ import {
   Info,
 } from "lucide-react";
 import { storage } from "@/lib/storage";
-import type { InsightData } from "@/lib/api";
+import type { InsightData, InsightEntry } from "@/lib/api";
 import {
   AreaChart,
   Area,
@@ -23,11 +23,13 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { AppLayout } from "@/components/AppLayout";
+import { useHandleFetchError } from "@/hooks/useHandleFetchError";
 
 export default function InsightsPage() {
   const [data, setData] = useState<InsightData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const handleFetchError = useHandleFetchError();
 
   const loadInsights = useCallback(async () => {
     try {
@@ -40,12 +42,12 @@ export default function InsightsPage() {
         setError(true);
       }
     } catch (err) {
-      console.error("Erro ao carregar insights:", err);
+      await handleFetchError(err, "Erro ao carregar insights:");
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [handleFetchError]);
 
   useEffect(() => {
     loadInsights();
@@ -248,44 +250,71 @@ export default function InsightsPage() {
         </div>
       </section>
 
-      {/* Sugestões de Otimização */}
+      {/* Sugestões de Otimização — geradas a partir das transações e
+          metas reais do usuário (categoria dominante, despesas
+          recorrentes, pressão de fluxo de caixa, tendência de receita
+          e projeção de metas). Nada aqui é texto fixo. */}
       <section className="space-y-4">
         <h2 className="text-lg font-semibold flex items-center gap-2 text-zinc-300">
           <CheckCircle2 className="text-emerald-500" size={20} />
           Sugestões de Otimização
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 flex items-start gap-3 hover:border-zinc-700 transition-colors cursor-pointer group">
-            <AlertCircle className="text-amber-500 shrink-0 mt-1" size={18} />
-            <div>
-              <p className="text-sm text-zinc-300 font-bold mb-1">Assinaturas Recorrentes</p>
-              <p className="text-xs text-zinc-500 leading-relaxed">
-                Detectamos serviços sem uso frequente. Economia potencial de <span className="text-emerald-500 font-bold">R$ 89,90</span>.
-              </p>
-            </div>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 h-24 animate-pulse" />
+            ))}
           </div>
-          <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 flex items-start gap-3 hover:border-zinc-700 transition-colors cursor-pointer group">
-            <TrendingDown className="text-emerald-500 shrink-0 mt-1" size={18} />
-            <div>
-              <p className="text-sm text-zinc-300 font-bold mb-1">Gastos Variáveis</p>
-              <p className="text-xs text-zinc-500 leading-relaxed">
-                Sua categoria “Alimentação” reduziu 10%. Continue com o bom gerenciamento!
-              </p>
-            </div>
+        ) : !data?.insights?.length ? (
+          <div className="p-6 rounded-lg bg-zinc-900 border border-zinc-800 text-center text-sm text-zinc-500">
+            Nenhuma sugestão disponível ainda. Adicione mais transações para liberar análises.
           </div>
-          <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 flex items-start gap-3 hover:border-zinc-700 transition-colors cursor-pointer group">
-            <Target className="text-blue-500 shrink-0 mt-1" size={18} />
-            <div>
-              <p className="text-sm text-zinc-300 font-bold mb-1">Metas Próximas</p>
-              <p className="text-xs text-zinc-500 leading-relaxed">
-                Você está a <span className="text-blue-400 font-bold">R$ 450,00</span> de completar sua “Reserva de Emergência”.
-              </p>
-            </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {data.insights.map((insight) => (
+              <InsightCard key={insight.id} insight={insight} />
+            ))}
           </div>
-        </div>
+        )}
       </section>
     </main>
     </AppLayout>
+  );
+}
+
+const INSIGHT_ICON: Record<InsightEntry["type"], typeof AlertCircle> = {
+  expense: AlertCircle,
+  income: TrendingUp,
+  cashflow: TrendingDown,
+  goal: Target,
+  risk: AlertCircle,
+  opportunity: CheckCircle2,
+};
+
+const SEVERITY_COLOR: Record<InsightEntry["severity"], string> = {
+  high: "text-rose-500",
+  medium: "text-amber-500",
+  low: "text-emerald-500",
+};
+
+function InsightCard({ insight }: { insight: InsightEntry }) {
+  const Icon = INSIGHT_ICON[insight.type] ?? Info;
+  const color = SEVERITY_COLOR[insight.severity] ?? "text-zinc-400";
+
+  return (
+    <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 flex items-start gap-3 hover:border-zinc-700 transition-colors">
+      <Icon className={`${color} shrink-0 mt-1`} size={18} />
+      <div className="min-w-0">
+        <p className="text-sm text-zinc-300 font-bold mb-1">{insight.title}</p>
+        <p className="text-xs text-zinc-500 leading-relaxed">{insight.message}</p>
+        {insight.metric_label && insight.metric_value && (
+          <p className="text-[11px] text-zinc-600 mt-1.5 uppercase tracking-wide">
+            {insight.metric_label}:{" "}
+            <span className="text-zinc-400 normal-case">{insight.metric_value}</span>
+          </p>
+        )}
+      </div>
+    </div>
   );
 }

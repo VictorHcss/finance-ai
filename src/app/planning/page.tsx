@@ -7,12 +7,14 @@ import { storage } from "@/lib/storage";
 import type { Goal } from "@/lib/api";
 import { Search, CheckCircle2 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
+import { useHandleFetchError } from "@/hooks/useHandleFetchError";
 
 export default function PlanningPage() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
+  const handleFetchError = useHandleFetchError();
 
   const loadGoals = useCallback(async () => {
     try {
@@ -20,11 +22,11 @@ export default function PlanningPage() {
       const data = await storage.getGoalsStatus();
       setGoals(data);
     } catch (err) {
-      console.error("Erro ao carregar metas:", err);
+      await handleFetchError(err, "Erro ao carregar metas:");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [handleFetchError]);
 
   useEffect(() => {
     loadGoals();

@@ -63,6 +63,22 @@ class AuthService:
             raise HTTPException(status_code=404, detail="Usuário não encontrado")
         return user
 
+    def update_profile(self, user_id: int, name: str | None, email: str | None) -> dict:
+        if email is not None:
+            normalized_email = sanitize_text(email).lower()
+            existing = self.repository.get_user_by_email(normalized_email)
+            if existing and existing["id"] != user_id:
+                raise HTTPException(status_code=409, detail="E-mail já cadastrado")
+            email = normalized_email
+        if name is not None:
+            name = sanitize_text(name)
+
+        return self.repository.update_profile(user_id, name, email)
+
+    def delete_account(self, user_id: int) -> dict:
+        self.repository.delete_user(user_id)
+        return {"status": "success", "message": "Conta excluída"}
+
     def _create_auth_response(self, user: dict) -> dict:
         session_token = generate_session_token()
         expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import Link from "next/link";
@@ -15,9 +15,15 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
+  const { register, session, loading: authLoading } = useAuth();
   const { addToast } = useToast();
   const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && session) {
+      router.replace("/dashboard");
+    }
+  }, [authLoading, session, router]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -37,7 +43,7 @@ export default function RegisterPage() {
     try {
       await register(name, email, password);
       addToast("success", "Conta criada com sucesso!");
-      router.push("/");
+      router.push("/dashboard");
     } catch {
       addToast("error", "Erro ao criar conta. Tente novamente.");
     } finally {
@@ -45,15 +51,19 @@ export default function RegisterPage() {
     }
   };
 
+  if (authLoading || session) return null;
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-md">
         <div className="text-center mb-7 sm:mb-8">
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/20 ring-1 ring-white/10">
-            <span className="text-black font-bold text-lg sm:text-xl">
-              $
-            </span>
-          </div>
+          <Link href="/" className="inline-block">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/20 ring-1 ring-white/10">
+              <span className="text-black font-bold text-lg sm:text-xl">
+                $
+              </span>
+            </div>
+          </Link>
           <h1 className="text-2xl sm:text-3xl font-bold text-emerald-500 mb-2 tracking-tight">
             Finance.AI
           </h1>

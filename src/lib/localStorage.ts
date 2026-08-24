@@ -5,6 +5,7 @@ import type {
   DashboardSummary,
   ChartDataPoint,
   UserProfile,
+  UserSettings,
   AuthSession,
 } from "./api";
 import {
@@ -22,6 +23,7 @@ import {
 const LS_KEY_PREFIX = "financeai";
 const LS_KEY_USERS = `${LS_KEY_PREFIX}.users`;
 const LS_KEY_CURRENT_LOCAL_USER_ID = `${LS_KEY_PREFIX}.currentLocalUserId`;
+const LS_KEY_SETTINGS = `${LS_KEY_PREFIX}.settings`;
 
 const MONTH_NAMES = [
   "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
@@ -191,6 +193,8 @@ function computeDashboardSummary(txs: Transaction[]): DashboardSummary {
     expenses,
     total,
     balance_trend_percentage: 0,
+    income_trend_percentage: 0,
+    expense_trend_percentage: 0,
     expense_ratio,
   };
 }
@@ -283,6 +287,11 @@ function computeInsights(txs: Transaction[]): InsightData | null {
     media_gastos,
     variacao_percentual,
     historico,
+    // O modo local (offline) não replica a análise estatística rica
+    // do backend (categoria dominante, recorrência, fluxo de caixa).
+    // A tela já trata array vazio mostrando uma mensagem apropriada,
+    // em vez de inventar sugestões que não vieram de dado real.
+    insights: [],
   };
 }
 
@@ -418,6 +427,63 @@ const localStorageBackend = {
       email: user.email,
       created_at: user.createdAt,
     };
+  },
+
+  async updateProfile(data: { name?: string; email?: string }): Promise<UserProfile> {
+    const userId = requireCurrentUserId();
+    const users = readLs<LocalUserRecord[]>(LS_KEY_USERS, []);
+    const user = users.find((u) => u.id === userId);
+    if (!user) throw new Error("Usuário não encontrado");
+    if (data.name) user.name = data.name;
+    if (data.email) user.email = data.email;
+    writeLs(LS_KEY_USERS, users);
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      created_at: user.createdAt,
+    };
+  },
+
+  async deleteAccount(): Promise<void> {
+    const userId = requireCurrentUserId();
+    const users = readLs<LocalUserRecord[]>(LS_KEY_USERS, []).filter((u) => u.id !== userId);
+    writeLs(LS_KEY_USERS, users);
+    setCurrentLocalUserId(null);
+  },
+
+  async getSettings(): Promise<UserSettings> {
+    const userId = requireCurrentUserId();
+    const all = readLs<Record<number, UserSettings>>(LS_KEY_SETTINGS, {});
+    return (
+      all[userId] || {
+        user_id: userId,
+        currency: "BRL",
+        locale: "pt-BR",
+        theme: "dark",
+        notifications_enabled: true,
+        ai_enabled: true,
+        updated_at: new Date().toISOString(),
+      }
+    );
+  },
+
+  async updateSettings(data: Partial<UserSettings>): Promise<UserSettings> {
+    const userId = requireCurrentUserId();
+    const all = readLs<Record<number, UserSettings>>(LS_KEY_SETTINGS, {});
+    const current = all[userId] || {
+      user_id: userId,
+      currency: "BRL",
+      locale: "pt-BR",
+      theme: "dark",
+      notifications_enabled: true,
+      ai_enabled: true,
+      updated_at: new Date().toISOString(),
+    };
+    const updated = { ...current, ...data, updated_at: new Date().toISOString() };
+    all[userId] = updated;
+    writeLs(LS_KEY_SETTINGS, all);
+    return updated;
   },
 
   // --- Transactions ---

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.dependencies import get_current_user_id
+from app.schemas.finance import ChartDataPoint, DashboardSummaryResponse
 from app.services.finance_service import FinanceService
 
 
@@ -8,12 +9,12 @@ router = APIRouter(tags=["dashboard"])
 service = FinanceService()
 
 
-@router.get("/api/dashboard-summary")
+@router.get("/api/dashboard-summary", response_model=DashboardSummaryResponse)
 def get_dashboard_summary(user_id: int = Depends(get_current_user_id)) -> dict:
     return service.get_dashboard_summary(user_id)
 
 
-@router.get("/api/chart-data")
+@router.get("/api/chart-data", response_model=list[ChartDataPoint])
 def get_chart_data(user_id: int = Depends(get_current_user_id)) -> list[dict]:
     transactions = service.list_transactions(user_id)
     monthly = {}

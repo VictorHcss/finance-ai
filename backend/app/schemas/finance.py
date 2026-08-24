@@ -44,6 +44,8 @@ class DashboardSummaryResponse(BaseModel):
     expenses: float
     total: float
     balance_trend_percentage: float
+    income_trend_percentage: float
+    expense_trend_percentage: float
     expense_ratio: float
 
 

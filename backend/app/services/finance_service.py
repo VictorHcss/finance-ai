@@ -18,6 +18,12 @@ class FinanceService:
     def list_transactions(self, user_id: int) -> List[dict]:
         return self.repository.list_transactions(user_id)
 
+    def update_transaction(self, user_id: int, transaction_id: int, payload: dict) -> dict:
+        updated_rows = self.repository.update_transaction(user_id, transaction_id, payload)
+        if not updated_rows:
+            raise HTTPException(status_code=404, detail="Transação não encontrada")
+        return {"status": "success", "message": "Transação atualizada"}
+
     def delete_transaction(self, user_id: int, transaction_id: int) -> dict:
         deleted_rows = self.repository.delete_transaction(user_id, transaction_id)
         if not deleted_rows:
@@ -83,21 +89,40 @@ class FinanceService:
         total = round(incomes - expenses, 2)
 
         monthly_balance = defaultdict(float)
+        monthly_incomes = defaultdict(float)
+        monthly_expenses = defaultdict(float)
         for transaction in transactions:
             month_key = self._to_month_key(transaction["date"])
-            monthly_balance[month_key] += transaction["amount"] if transaction["type"] == "income" else -transaction["amount"]
+            amount = transaction["amount"]
+            if transaction["type"] == "income":
+                monthly_balance[month_key] += amount
+                monthly_incomes[month_key] += amount
+            else:
+                monthly_balance[month_key] -= amount
+                monthly_expenses[month_key] += amount
 
-        ordered_balances = [value for _, value in sorted(monthly_balance.items())]
-        trend = 0.0
-        if len(ordered_balances) >= 2 and ordered_balances[-2] != 0:
-            trend = ((ordered_balances[-1] - ordered_balances[-2]) / abs(ordered_balances[-2])) * 100
+        def month_over_month_trend(monthly_values: dict) -> float:
+            """Compara o valor do mês mais recente com o do mês anterior
+            a ele. Usado separadamente para saldo, entradas e saídas —
+            antes, o frontend reaproveitava por engano a mesma variação
+            de despesas para o card de Entradas também."""
+            ordered = [value for _, value in sorted(monthly_values.items())]
+            if len(ordered) < 2 or ordered[-2] == 0:
+                return 0.0
+            return round(((ordered[-1] - ordered[-2]) / abs(ordered[-2])) * 100, 1)
+
+        trend = month_over_month_trend(monthly_balance)
+        income_trend = month_over_month_trend(monthly_incomes)
+        expense_trend = month_over_month_trend(monthly_expenses)
 
         expense_ratio = round((expenses / incomes) * 100, 2) if incomes > 0 else 0.0
         return {
             "incomes": incomes,
             "expenses": expenses,
             "total": total,
-            "balance_trend_percentage": round(trend, 1),
+            "balance_trend_percentage": trend,
+            "income_trend_percentage": income_trend,
+            "expense_trend_percentage": expense_trend,
             "expense_ratio": expense_ratio,
         }
 

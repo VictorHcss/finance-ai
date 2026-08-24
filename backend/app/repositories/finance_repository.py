@@ -42,6 +42,29 @@ class FinanceRepository:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def update_transaction(self, user_id: int, transaction_id: int, payload: dict) -> int:
+        now = datetime.now(timezone.utc).isoformat()
+        with get_connection() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE transactions
+                SET description = ?, amount = ?, type = ?, category = ?, date = ?, updated_at = ?
+                WHERE id = ? AND user_id = ?
+                """,
+                (
+                    payload["description"],
+                    payload["amount"],
+                    payload["type"],
+                    payload["category"],
+                    payload["date"],
+                    now,
+                    transaction_id,
+                    user_id,
+                ),
+            )
+            conn.commit()
+        return cursor.rowcount
+
     def delete_transaction(self, user_id: int, transaction_id: int) -> int:
         with get_connection() as conn:
             cursor = conn.execute(

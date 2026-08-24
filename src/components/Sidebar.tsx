@@ -15,7 +15,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/" },
+  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: Receipt, label: "Transações", href: "/transactions" },
   { icon: Wallet, label: "Planejamento", href: "/planning" },
   { icon: BrainCircuit, label: "Insights IA", href: "/insights" },

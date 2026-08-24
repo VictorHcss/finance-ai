@@ -8,24 +8,37 @@ from app.repositories.auth_repository import AuthRepository
 
 
 def get_current_user_id(
-    x_user_id: Optional[int] = Header(default=None, alias="X-User-Id"),
     authorization: Optional[str] = Header(default=None, alias="Authorization"),
 ) -> int:
+    """Identifica o usuário autenticado a partir do token de sessão.
+
+    Antes, quando o token não vinha ou era inválido, esta função caía
+    num fallback que confiava no cabeçalho `X-User-Id` (enviado pelo
+    próprio cliente) ou, na ausência dele, assumia `user_id = 1`.
+    Isso permitia que qualquer requisição sem nenhuma credencial real
+    acessasse dados de qualquer usuário só forjando um cabeçalho.
+    Agora, sem uma sessão válida, a resposta é sempre 401.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Não autenticado")
+
+    token = authorization.replace("Bearer ", "", 1).strip()
     repository = AuthRepository()
+    session = repository.get_session(token)
 
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization.replace("Bearer ", "", 1).strip()
-        session = repository.get_session(token)
-        if session:
-            expires_at = datetime.fromisoformat(session["expires_at"])
-            if expires_at.tzinfo is None:
-                expires_at = expires_at.replace(tzinfo=timezone.utc)
-            if expires_at >= datetime.now(timezone.utc):
-                return int(session["user_id"])
+    if not session:
+        raise HTTPException(status_code=401, detail="Sessão inválida ou expirada")
 
-    user_id = x_user_id or 1
+    expires_at = datetime.fromisoformat(session["expires_at"])
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=401, detail="Sessão inválida ou expirada")
+
+    user_id = int(session["user_id"])
     if not repository.get_user_by_id(user_id):
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+        raise HTTPException(status_code=401, detail="Sessão inválida ou expirada")
+
     return user_id
 
 

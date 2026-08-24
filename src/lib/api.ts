@@ -1,6 +1,32 @@
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
+const SESSION_STORAGE_KEY = "financeai_session";
+
+/* Lê o token de sessão direto do localStorage (mesma chave usada pelo
+   AuthContext). Fica aqui, e não como argumento de cada função, porque
+   api.ts é um módulo comum — sem acesso ao React Context — e assim
+   toda chamada autenticada ganha o header automaticamente, sem
+   precisar que cada tela se lembre de passar o token na mão. */
+function getStoredSessionToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { session_token?: string };
+    return parsed?.session_token || null;
+  } catch {
+    return null;
+  }
+}
+
+function withAuthHeaders(headers: HeadersInit = {}): HeadersInit {
+  const token = getStoredSessionToken();
+  return token
+    ? { ...headers, Authorization: `Bearer ${token}` }
+    : headers;
+}
+
 export type Transaction = {
   id?: number;
   description: string;
@@ -23,6 +49,16 @@ export type Goal = {
 
 export type GoalStatus = "active" | "completed" | "all";
 
+export type InsightEntry = {
+  id: string;
+  type: "expense" | "income" | "cashflow" | "goal" | "risk" | "opportunity";
+  severity: "low" | "medium" | "high";
+  title: string;
+  message: string;
+  metric_label?: string;
+  metric_value?: string;
+};
+
 export type InsightData = {
   alerta: string;
   previsao_proximo_mes: number;
@@ -33,6 +69,7 @@ export type InsightData = {
     mes: string;
     valor: number;
   }[];
+  insights: InsightEntry[];
 };
 
 export type DashboardSummary = {
@@ -40,6 +77,8 @@ export type DashboardSummary = {
   expenses: number;
   total: number;
   balance_trend_percentage: number;
+  income_trend_percentage: number;
+  expense_trend_percentage: number;
   expense_ratio: number;
 };
 
@@ -55,6 +94,16 @@ export type UserProfile = {
   email: string;
   created_at?: string;
   updated_at?: string;
+};
+
+export type UserSettings = {
+  user_id: number;
+  currency: string;
+  locale: string;
+  theme: string;
+  notifications_enabled: boolean;
+  ai_enabled: boolean;
+  updated_at: string;
 };
 
 export type AuthSession = {
@@ -123,6 +172,7 @@ const fetchWithTimeout = async (
   try {
     const response = await fetch(url, {
       ...options,
+      headers: withAuthHeaders(options.headers),
       signal: controller.signal,
     });
 
@@ -226,13 +276,7 @@ export const api = {
   // Transactions
 
   getTransactions: async (): Promise<Transaction[]> => {
-    try {
-      return await fetchWithTimeout(`${API_URL}/transactions`);
-    } catch (e) {
-      console.error("Erro ao buscar transações:", e);
-
-      return [];
-    }
+    return await fetchWithTimeout(`${API_URL}/transactions`);
   },
 
   createTransaction: async (data: Partial<Transaction>) => {
@@ -263,13 +307,7 @@ export const api = {
 
   // Goals
   getGoalsStatus: async (): Promise<Goal[]> => {
-    try {
-      return await fetchWithTimeout(`${API_URL}/goals/status`);
-    } catch (e) {
-      console.error("Erro ao buscar metas:", e);
-
-      return [];
-    }
+    return await fetchWithTimeout(`${API_URL}/goals/status`);
   },
 
   createGoal: async (data: Partial<Goal>) => {
@@ -306,41 +344,17 @@ export const api = {
 
   // Dashboard
   getSummary: async (): Promise<DashboardSummary> => {
-    try {
-      return await fetchWithTimeout(`${API_URL}/dashboard-summary`);
-    } catch (e) {
-      console.error("Erro ao buscar resumo:", e);
-
-      return {
-        incomes: 0,
-        expenses: 0,
-        total: 0,
-        balance_trend_percentage: 0,
-        expense_ratio: 0,
-      };
-    }
+    return await fetchWithTimeout(`${API_URL}/dashboard-summary`);
   },
 
   // Insights
   getInsights: async (): Promise<InsightData | null> => {
-    try {
-      return await fetchWithTimeout(`${API_URL}/insights`);
-    } catch (e) {
-      console.error("Erro ao buscar insights:", e);
-
-      return null;
-    }
+    return await fetchWithTimeout(`${API_URL}/insights`);
   },
 
   // Charts
   getChartData: async (): Promise<ChartDataPoint[]> => {
-    try {
-      return await fetchWithTimeout(`${API_URL}/chart-data`);
-    } catch (e) {
-      console.error("Erro ao buscar gráficos:", e);
-
-      return [];
-    }
+    return await fetchWithTimeout(`${API_URL}/chart-data`);
   },
 
   // Authentication
@@ -375,11 +389,11 @@ export const api = {
   },
 
   logout: async (sessionToken: string) => {
+    void sessionToken; // mantido na assinatura por compatibilidade de chamada
     return await fetchWithTimeout(`${API_URL}/auth/logout`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${sessionToken}`,
       },
     });
   },
@@ -387,6 +401,34 @@ export const api = {
   getProfile: async (): Promise<UserProfile> => {
     return await fetchWithTimeout(`${API_URL}/auth/profile`, {
       method: "GET",
+    });
+  },
+
+  updateProfile: async (data: { name?: string; email?: string }): Promise<UserProfile> => {
+    return await fetchWithTimeout(`${API_URL}/auth/profile`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteAccount: async (): Promise<void> => {
+    return await fetchWithTimeout(`${API_URL}/auth/account`, {
+      method: "DELETE",
+    });
+  },
+
+  getSettings: async (): Promise<UserSettings> => {
+    return await fetchWithTimeout(`${API_URL}/settings`, {
+      method: "GET",
+    });
+  },
+
+  updateSettings: async (data: Partial<UserSettings>): Promise<UserSettings> => {
+    return await fetchWithTimeout(`${API_URL}/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
     });
   },
 };
