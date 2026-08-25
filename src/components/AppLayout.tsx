@@ -4,6 +4,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Sidebar } from "@/components/Sidebar";
 import { Navbar } from "@/components/Navbar";
 import { NewTransactionModal } from "@/components/NewTransactionModal";
+import { LogoutConfirmDialog } from "@/components/LogoutConfirmDialog";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -19,6 +20,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
           <NewTransactionModal />
         </div>
+        <LogoutConfirmDialog />
       </div>
     </ProtectedRoute>
   );

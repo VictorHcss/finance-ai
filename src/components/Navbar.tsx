@@ -4,8 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Bell, LogOut } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRouter, usePathname } from "next/navigation";
-import { useToast } from "@/contexts/ToastContext";
+import { usePathname } from "next/navigation";
 import { NotificationBadge, useNotificationsQuery } from "@/features/notifications";
 import { NotificationStatus } from "@/features/notifications/types";
 
@@ -21,9 +20,7 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
 export function Navbar() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const { user, logout } = useAuth();
-  const router = useRouter();
-  const { addToast } = useToast();
+  const { user } = useAuth();
   const pathname = usePathname();
   const unreadCountQuery = useNotificationsQuery(
     { status: NotificationStatus.Unread, page: 1, page_size: 1 },
@@ -47,14 +44,11 @@ export function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      addToast("success", "Logout realizado com sucesso!");
-      router.push("/login");
-    } catch {
-      addToast("error", "Erro ao fazer logout.");
-    }
+  // Centralizado em <LogoutConfirmDialog />, montado uma única vez em
+  // AppLayout — este botão só avisa que o usuário quer sair, e deixa
+  // a confirmação/execução do logout num só lugar do sistema.
+  const requestLogout = () => {
+    window.dispatchEvent(new Event("request-logout"));
     setIsUserMenuOpen(false);
   };
 
@@ -130,7 +124,7 @@ export function Navbar() {
                 </div>
                 <div className="p-2">
                   <button
-                    onClick={handleLogout}
+                    onClick={requestLogout}
                     className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800/70 rounded-xl transition-all duration-200 hover:text-rose-400 group"
                   >
                     <LogOut size={17} className="group-hover:scale-110 transition-transform" />

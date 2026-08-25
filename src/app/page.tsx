@@ -12,17 +12,30 @@ import {
   ShieldCheck,
   Wallet,
   Sparkles,
+  UserPlus,
+  ListChecks,
+  TrendingUp,
+  WifiOff,
+  Lock,
+  ChevronDown,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 
-const FEATURES = [
+const MODULES = [
   {
     icon: LineChart,
-    title: "Visão completa das finanças",
+    title: "Dashboard financeiro",
     description:
-      "Saldo, entradas, saídas e fluxo mensal em um dashboard único — sem precisar abrir planilha nenhuma.",
+      "Saldo, entradas e saídas com a tendência de cada um mês a mês — sem precisar abrir planilha nenhuma.",
     color: "text-emerald-500 bg-emerald-500/10",
+  },
+  {
+    icon: Wallet,
+    title: "Transações organizadas",
+    description:
+      "Registre, edite e categorize entradas e saídas em poucos cliques, com histórico completo e pesquisável.",
+    color: "text-teal-400 bg-teal-400/10",
   },
   {
     icon: Target,
@@ -33,39 +46,103 @@ const FEATURES = [
   },
   {
     icon: BrainCircuit,
-    title: "Insights inteligentes",
+    title: "Insights a partir do seu histórico",
     description:
-      "Projeções de gastos e análise de tendência a partir do seu próprio histórico financeiro.",
+      "Categoria de gasto dominante, despesas recorrentes e projeção de metas — calculado a partir das suas transações reais.",
     color: "text-purple-400 bg-purple-400/10",
   },
   {
     icon: Bell,
     title: "Central de notificações",
     description:
-      "Avisos de gastos fora do padrão e atualizações das suas metas, tudo em um só lugar.",
+      "Avisos de gastos fora do padrão e atualizações de metas reunidos em um só lugar, sem precisar caçar informação.",
     color: "text-amber-400 bg-amber-400/10",
   },
   {
     icon: ShieldCheck,
-    title: "Seus dados, só seus",
+    title: "Conta protegida",
     description:
-      "Autenticação real por conta e isolamento completo de dados — ninguém além de você vê suas finanças.",
+      "Autenticação real e dados isolados por conta — ninguém além de você tem acesso às suas finanças.",
     color: "text-rose-400 bg-rose-400/10",
   },
+];
+
+const DIFFERENTIATORS = [
   {
-    icon: Wallet,
-    title: "Controle total das transações",
+    icon: BrainCircuit,
+    title: "Insights de verdade, não genéricos",
     description:
-      "Registre, edite e organize entradas e saídas por categoria com poucos cliques.",
-    color: "text-teal-400 bg-teal-400/10",
+      "Nada de frases prontas: cada recomendação é calculada em cima do seu próprio histórico de transações.",
+  },
+  {
+    icon: Lock,
+    title: "Isolamento real entre contas",
+    description:
+      "Cada usuário só acessa os próprios dados — validado explicitamente, não é só uma promessa.",
+  },
+  {
+    icon: WifiOff,
+    title: "Continua funcionando sem servidor",
+    description:
+      "Se o backend ficar indisponível, o sistema segue operando localmente no seu navegador até a conexão voltar.",
   },
 ];
+
+const HOW_IT_WORKS = [
+  {
+    icon: UserPlus,
+    step: "1",
+    title: "Crie sua conta",
+    description: "Leva menos de um minuto — só nome, e-mail e senha.",
+  },
+  {
+    icon: ListChecks,
+    step: "2",
+    title: "Registre suas transações",
+    description: "Entradas e saídas, cada uma com sua categoria.",
+  },
+  {
+    icon: TrendingUp,
+    step: "3",
+    title: "Acompanhe metas e insights",
+    description: "O sistema aprende com seu histórico e mostra o que importa.",
+  },
+];
+
+const FAQ = [
+  {
+    question: "Preciso pagar para usar o Finance.AI?",
+    answer: "Não. Você pode criar sua conta e usar o sistema gratuitamente.",
+  },
+  {
+    question: "Meus dados financeiros ficam visíveis para outras pessoas?",
+    answer:
+      "Não. Cada conta tem autenticação própria e acesso isolado aos próprios dados — isso já foi testado explicitamente com múltiplas contas simultâneas.",
+  },
+  {
+    question: "Como os insights são gerados?",
+    answer:
+      "A partir do histórico real das suas transações: categoria de gasto dominante, despesas recorrentes detectadas automaticamente e tendência mês a mês. Não são recomendações genéricas.",
+  },
+  {
+    question: "O sistema funciona sem internet?",
+    answer:
+      "Se o servidor ficar indisponível, o Finance.AI passa a funcionar localmente no seu navegador automaticamente, para você não ficar sem acesso.",
+  },
+  {
+    question: "Funciona bem no celular?",
+    answer: "Sim, a interface é totalmente responsiva, do dashboard ao editor de transações.",
+  },
+];
+
+const TRUST_BADGES = ["Grátis para começar", "Sem cartão de crédito", "Dados isolados por conta"];
 
 export default function LandingPage() {
   const { session, loading, login } = useAuth();
   const { addToast } = useToast();
   const router = useRouter();
   const [demoLoading, setDemoLoading] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   // Quem já está logado não precisa ver a landing — manda direto pro app
   useEffect(() => {
@@ -104,7 +181,18 @@ export default function LandingPage() {
               FINANCE.AI
             </span>
           </div>
-          <nav className="flex items-center gap-3 sm:gap-6">
+          <nav className="hidden md:flex items-center gap-7">
+            <a href="#funcionalidades" className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors">
+              Funcionalidades
+            </a>
+            <a href="#como-funciona" className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors">
+              Como funciona
+            </a>
+            <a href="#faq" className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors">
+              Dúvidas
+            </a>
+          </nav>
+          <div className="flex items-center gap-3 sm:gap-4">
             <Link
               href="/login"
               className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors"
@@ -117,43 +205,50 @@ export default function LandingPage() {
             >
               Criar conta grátis
             </Link>
-          </nav>
+          </div>
         </div>
       </header>
 
       {/* Hero */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-14 sm:pb-20 text-center">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-10 sm:pb-14 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mb-6">
           <Sparkles size={13} />
-          Controle financeiro com apoio de análise inteligente
+          Controle financeiro pessoal com insights baseados no seu histórico real
         </div>
         <h1 className="text-3xl sm:text-5xl font-bold tracking-tight leading-tight max-w-3xl mx-auto">
           Entenda para onde vai o seu dinheiro —{" "}
           <span className="text-emerald-500">antes que ele acabe.</span>
         </h1>
         <p className="text-zinc-400 text-base sm:text-lg mt-5 max-w-xl mx-auto">
-          Transações, metas e projeções em um só painel. Sem planilha,
-          sem letra miúda, sem complicação.
+          Transações, metas e projeções em um só painel, feito para quem quer
+          sair da planilha sem perder o controle. Sem letra miúda, sem
+          complicação.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-9">
           <Link
             href="/register"
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-6 py-3 rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-emerald-500/20"
           >
-            Criar minha conta grátis
+            Criar conta grátis
             <ArrowRight size={18} />
           </Link>
-          <button
-            onClick={handleTryDemo}
-            disabled={demoLoading}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 font-semibold px-6 py-3 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50"
+          <a
+            href="#como-funciona"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 font-semibold px-6 py-3 rounded-xl transition-all active:scale-[0.98]"
           >
-            {demoLoading ? "Abrindo demonstração..." : "Ver demonstração ao vivo"}
-          </button>
+            Ver como funciona
+          </a>
         </div>
-        <p className="text-zinc-600 text-xs mt-4">
-          A demonstração usa uma conta de exemplo com dados fictícios — não é preciso cadastro.
-        </p>
+
+        {/* Selos de confiança — só afirmações reais, sem métricas inventadas */}
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-8 text-xs text-zinc-500">
+          {TRUST_BADGES.map((badge) => (
+            <span key={badge} className="inline-flex items-center gap-1.5">
+              <span className="w-1 h-1 rounded-full bg-emerald-500" />
+              {badge}
+            </span>
+          ))}
+        </div>
       </section>
 
       {/* Preview ilustrativo do produto */}
@@ -195,24 +290,63 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
+        <p className="text-center text-xs text-zinc-600 mt-4">
+          Quer ver com dados reais sem criar conta?{" "}
+          <button
+            onClick={handleTryDemo}
+            disabled={demoLoading}
+            className="text-zinc-400 hover:text-emerald-400 underline underline-offset-2 transition-colors disabled:opacity-50"
+          >
+            {demoLoading ? "Abrindo demonstração..." : "Acessar a conta de demonstração"}
+          </button>
+        </p>
       </section>
 
-      {/* Diferenciais */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-20 sm:pb-28">
+      {/* Como funciona */}
+      <section id="como-funciona" className="max-w-5xl mx-auto px-4 sm:px-6 pb-20 sm:pb-28 scroll-mt-16">
+        <div className="text-center mb-12">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Como funciona</h2>
+          <p className="text-zinc-400 mt-3 max-w-lg mx-auto">
+            Três passos entre criar a conta e ter clareza sobre suas finanças.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-4">
+          {HOW_IT_WORKS.map((step, index) => (
+            <div key={step.step} className="relative text-center px-2">
+              {index < HOW_IT_WORKS.length - 1 && (
+                <div className="hidden sm:block absolute top-7 left-[60%] w-full h-px bg-zinc-800" />
+              )}
+              <div className="relative inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 mb-4">
+                <step.icon size={22} className="text-emerald-500" />
+                <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-emerald-500 text-black text-[10px] font-bold flex items-center justify-center">
+                  {step.step}
+                </span>
+              </div>
+              <h3 className="font-semibold mb-1.5">{step.title}</h3>
+              <p className="text-sm text-zinc-400 leading-relaxed max-w-[220px] mx-auto">
+                {step.description}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Funcionalidades */}
+      <section id="funcionalidades" className="max-w-6xl mx-auto px-4 sm:px-6 pb-20 sm:pb-28 scroll-mt-16">
         <div className="text-center mb-12">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
             Tudo que você precisa para organizar sua vida financeira
           </h2>
           <p className="text-zinc-400 mt-3 max-w-lg mx-auto">
-            Cada recurso pensado para reduzir o esforço de manter suas
+            Cada módulo pensado para reduzir o esforço de manter suas
             finanças em dia.
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {FEATURES.map((feature) => (
+          {MODULES.map((feature) => (
             <div
               key={feature.title}
-              className="p-5 sm:p-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 hover:bg-zinc-900/70 transition-colors"
+              className="p-5 sm:p-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 hover:bg-zinc-900/70 hover:border-zinc-700 transition-colors"
             >
               <div
                 className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${feature.color}`}
@@ -225,6 +359,62 @@ export default function LandingPage() {
               </p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Diferenciais */}
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 pb-20 sm:pb-28">
+        <div className="text-center mb-12">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Por que o Finance.AI</h2>
+          <p className="text-zinc-400 mt-3 max-w-lg mx-auto">
+            Três decisões de arquitetura que fazem diferença no uso diário.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          {DIFFERENTIATORS.map((item) => (
+            <div key={item.title} className="text-center px-2">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-500/10 mb-4">
+                <item.icon size={20} className="text-emerald-500" />
+              </div>
+              <h3 className="font-semibold mb-1.5">{item.title}</h3>
+              <p className="text-sm text-zinc-400 leading-relaxed">{item.description}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" className="max-w-3xl mx-auto px-4 sm:px-6 pb-20 sm:pb-28 scroll-mt-16">
+        <div className="text-center mb-10">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Perguntas frequentes</h2>
+        </div>
+        <div className="space-y-3">
+          {FAQ.map((item, index) => {
+            const isOpen = openFaq === index;
+            return (
+              <div
+                key={item.question}
+                className="rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden"
+              >
+                <button
+                  onClick={() => setOpenFaq(isOpen ? null : index)}
+                  aria-expanded={isOpen}
+                  className="w-full flex items-center justify-between gap-4 p-4 sm:p-5 text-left"
+                >
+                  <span className="text-sm sm:text-base font-medium">{item.question}</span>
+                  <ChevronDown
+                    size={18}
+                    className={`shrink-0 text-zinc-500 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {isOpen && (
+                  <p className="px-4 sm:px-5 pb-4 sm:pb-5 text-sm text-zinc-400 leading-relaxed">
+                    {item.answer}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -252,6 +442,9 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-500">
           <span>© {new Date().getFullYear()} Finance.AI</span>
           <div className="flex items-center gap-5">
+            <a href="#funcionalidades" className="hover:text-zinc-300 transition-colors">
+              Funcionalidades
+            </a>
             <Link href="/login" className="hover:text-zinc-300 transition-colors">
               Entrar
             </Link>
