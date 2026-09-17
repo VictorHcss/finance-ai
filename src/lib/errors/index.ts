@@ -1,2 +1,2 @@
-cexport * from "./AppError";
+export * from "./AppError";
 export * from "./http";
