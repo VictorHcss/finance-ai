@@ -116,11 +116,14 @@ export function TransactionList() {
                     "aparece só no hover" não existe em quem usa o dedo, o
                     botão simplesmente nunca aparecia nesses aparelhos. Do
                     md pra cima, mantém o hover-to-reveal (mais limpo no
-                    desktop, onde o mouse dá esse sinal). */}
+                    desktop, onde o mouse dá esse sinal). Área de toque em
+                    44x44 (abaixo de md) — WCAG recomenda esse mínimo, e os
+                    32x32 anteriores ficavam justos ao lado um do outro
+                    (editar bem colado no excluir, que é destrutivo). */}
                 <button
                   onClick={() => window.dispatchEvent(new CustomEvent("open-transaction-modal", { detail: t }))}
                   aria-label={`Editar transação ${t.description}`}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800 hover:text-emerald-500 transition-colors md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
+                  className="flex h-11 w-11 md:h-8 md:w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800 hover:text-emerald-500 transition-colors md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
                 >
                   <Pencil size={16} />
                 </button>
@@ -129,7 +132,7 @@ export function TransactionList() {
                   onClick={() => handleDelete(t)}
                   disabled={deletingId === t.id}
                   aria-label={`Excluir transação ${t.description}`}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-rose-500/10 hover:text-rose-500 transition-colors md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 disabled:opacity-50"
+                  className="flex h-11 w-11 md:h-8 md:w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-rose-500/10 hover:text-rose-500 transition-colors md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 disabled:opacity-50"
                 >
                   <Trash2 size={16} />
                 </button>

@@ -61,6 +61,26 @@ export type InsightEntry = {
   message: string;
   metric_label?: string;
   metric_value?: string;
+  /** Explicabilidade (de onde vem o número), quando o insight tiver. */
+  explanation?: {
+    current_period_label: string;
+    previous_period_label: string;
+    current_value: number;
+    previous_value: number;
+    difference: number;
+    percentage: number;
+    top_contributors: { label: string; value: number }[];
+  };
+};
+
+export type MonthlySummary = {
+  month_label: string;
+  incomes: number;
+  expenses: number;
+  balance: number;
+  top_categories: { category: string; total: number; percentage: number }[];
+  income_trend_percentage: number;
+  expense_trend_percentage: number;
 };
 
 export type InsightData = {
@@ -80,6 +100,8 @@ export type InsightData = {
     valor: number;
   }[];
   insights: InsightEntry[];
+  /** Resumo consolidado do mês atual — ausente quando não há dados suficientes. */
+  resumo_mensal?: MonthlySummary | null;
 };
 
 export type DashboardSummary = {

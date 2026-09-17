@@ -3,6 +3,7 @@ from datetime import date, datetime
 from statistics import mean
 from typing import List
 
+from app.core.categorization import format_category_label, normalize_category_key
 from app.repositories.finance_repository import FinanceRepository
 
 
@@ -54,7 +55,12 @@ class InsightService:
         monthly_expenses = defaultdict(float)
         monthly_incomes = defaultdict(float)
         monthly_category_expenses = defaultdict(lambda: defaultdict(float))
+        # [month][category_key][description_key] -> total — usado só para
+        # explicar (seção 12 do prompt) qual insight de categoria: quais
+        # descrições concretas empurraram o gasto pra cima.
+        category_description_totals = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
         category_totals = Counter()
+        category_labels: dict = {}
         recurring_counter = Counter()
         recurring_amounts = defaultdict(float)
 
@@ -68,12 +74,19 @@ class InsightService:
             month_key = transaction_date.strftime("%Y-%m")
             description_key = transaction["description"].strip().lower()
             amount = float(transaction["amount"])
-            category = transaction["category"]
+            # Duas grafias da mesma categoria ("Alimentação" e
+            # "alimentação") devem somar juntas — agrupa por uma chave
+            # normalizada e guarda um rótulo amigável pra exibição,
+            # sem alterar o dado original armazenado.
+            category_key = normalize_category_key(transaction["category"])
+            if category_key not in category_labels:
+                category_labels[category_key] = format_category_label(transaction["category"])
 
             if transaction["type"] == "expense":
                 monthly_expenses[month_key] += amount
-                monthly_category_expenses[month_key][category] += amount
-                category_totals[category] += amount
+                monthly_category_expenses[month_key][category_key] += amount
+                category_description_totals[month_key][category_key][description_key] += amount
+                category_totals[category_key] += amount
                 recurring_counter[description_key] += 1
                 recurring_amounts[description_key] += amount
             else:
@@ -116,6 +129,7 @@ class InsightService:
         insights = []
 
         if top_category[0]:
+            top_category_label = category_labels.get(top_category[0], top_category[0])
             category_share = (top_category[1] / current_expenses) * 100 if current_expenses > 0 else 0
             insights.append(
                 {
@@ -124,11 +138,65 @@ class InsightService:
                     "severity": "high" if category_share >= 35 else "medium",
                     "title": "Categoria dominante de gasto",
                     "message": (
-                        f"{top_category[0]} concentrou {category_share:.0f}% das saídas do mês, "
+                        f"{top_category_label} concentrou {category_share:.0f}% das saídas do mês, "
                         f"somando R$ {top_category[1]:.2f}."
                     ),
                     "metric_label": "Maior categoria",
-                    "metric_value": top_category[0],
+                    "metric_value": top_category_label,
+                }
+            )
+
+        # Análise de comportamento: qual categoria mais aumentou de gasto
+        # em relação ao mês anterior, com explicabilidade (seções 9 e 12
+        # do prompt) — de onde vem o número, não só o número em si.
+        # Só gera a análise quando há uma base no mês anterior pra
+        # comparar (sem isso seria "falsa precisão", proibido na seção 6).
+        current_category_map = monthly_category_expenses.get(current_month_key, {})
+        previous_category_map = monthly_category_expenses.get(previous_month_key, {})
+        behavior_change_key = None
+        behavior_change_diff = 0.0
+        behavior_current_value = 0.0
+        behavior_previous_value = 0.0
+        for cat_key, current_amount in current_category_map.items():
+            previous_amount = previous_category_map.get(cat_key, 0.0)
+            if previous_amount <= 0:
+                continue
+            diff = current_amount - previous_amount
+            if diff > behavior_change_diff:
+                behavior_change_diff = diff
+                behavior_change_key = cat_key
+                behavior_current_value = current_amount
+                behavior_previous_value = previous_amount
+
+        if behavior_change_key:
+            behavior_label = category_labels.get(behavior_change_key, behavior_change_key)
+            behavior_percentage = (behavior_change_diff / behavior_previous_value) * 100
+            contributors_map = category_description_totals[current_month_key][behavior_change_key]
+            top_contributors = sorted(contributors_map.items(), key=lambda item: item[1], reverse=True)[:3]
+            insights.append(
+                {
+                    "id": "category-behavior-change",
+                    "type": "expense",
+                    "severity": "high" if behavior_percentage >= 30 else "medium",
+                    "title": "Mudança de comportamento detectada",
+                    "message": (
+                        f"Seus gastos com {behavior_label} aumentaram {behavior_percentage:.0f}% "
+                        f"em relação ao mês anterior."
+                    ),
+                    "metric_label": "Categoria",
+                    "metric_value": behavior_label,
+                    "explanation": {
+                        "current_period_label": "Este mês",
+                        "previous_period_label": "Mês anterior",
+                        "current_value": round(behavior_current_value, 2),
+                        "previous_value": round(behavior_previous_value, 2),
+                        "difference": round(behavior_change_diff, 2),
+                        "percentage": round(behavior_percentage, 1),
+                        "top_contributors": [
+                            {"label": label.title(), "value": round(value, 2)}
+                            for label, value in top_contributors
+                        ],
+                    },
                 }
             )
 
@@ -237,6 +305,32 @@ class InsightService:
 
         primary_alert = insights[0]["message"] if insights else "Os dados estão estáveis neste momento."
 
+        # Resumo financeiro mensal (seção 10 do prompt): visão consolidada
+        # do mês atual, funciona igual no modo LocalStorage.
+        top_categories_month = sorted(
+            current_category_map.items(), key=lambda item: item[1], reverse=True
+        )[:3]
+        resumo_mensal = {
+            "month_label": f"{MONTHS_MAP.get(current_month_key.split('-')[1], current_month_key)}/{current_month_key.split('-')[0][2:]}",
+            "incomes": round(current_incomes, 2),
+            "expenses": round(current_expenses, 2),
+            "balance": round(current_incomes - current_expenses, 2),
+            "top_categories": [
+                {
+                    "category": category_labels.get(cat_key, cat_key),
+                    "total": round(total, 2),
+                    "percentage": round((total / current_expenses) * 100, 1) if current_expenses > 0 else 0.0,
+                }
+                for cat_key, total in top_categories_month
+            ],
+            "income_trend_percentage": (
+                round(((current_incomes - previous_incomes) / previous_incomes) * 100, 1)
+                if previous_incomes > 0
+                else 0.0
+            ),
+            "expense_trend_percentage": variacao_percentual,
+        }
+
         return {
             "alerta": primary_alert,
             "previsao_proximo_mes": round(max(forecast_expenses, media_gastos), 2),
@@ -245,6 +339,7 @@ class InsightService:
             "variacao_percentual": variacao_percentual,
             "historico": expense_history,
             "insights": insights,
+            "resumo_mensal": resumo_mensal,
         }
 
     @staticmethod

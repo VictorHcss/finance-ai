@@ -108,11 +108,11 @@ export default function Home() {
 
     if (type === "income") {
       if (value > 0) {
-        return `Faturamento subiu ${absValue}% este mês! 🚀`;
+        return `Suas entradas subiram ${absValue}% em relação ao mês anterior.`;
       }
 
       if (value < 0) {
-        return `Entradas caíram ${absValue}%. Hora de prospectar?`;
+        return `Suas entradas caíram ${absValue}% em relação ao mês anterior.`;
       }
 
       return "Suas entradas estão estáveis.";
@@ -120,11 +120,11 @@ export default function Home() {
 
     if (type === "expense") {
       if (value > 0) {
-        return `Gastos aumentaram ${absValue}%. Atenção ao teto!`;
+        return `Seus gastos subiram ${absValue}% em relação ao mês anterior.`;
       }
 
       if (value < 0) {
-        return `Economia de ${absValue}%! Ótima gestão. 👏`;
+        return `Seus gastos caíram ${absValue}% em relação ao mês anterior.`;
       }
 
       return "Seus gastos se mantiveram constantes.";
@@ -235,6 +235,13 @@ export default function Home() {
                   </p>
                 </div>
               </div>
+
+              <Link
+                href="/insights"
+                className="inline-block text-xs font-medium text-ai-300 hover:text-ai-200 underline underline-offset-2"
+              >
+                Ver todos os insights
+              </Link>
             </div>
           ) : (
             <div className="space-y-2 relative">

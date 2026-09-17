@@ -48,8 +48,8 @@ const MODULES = [
     icon: BrainCircuit,
     title: "Insights a partir do seu histórico",
     description:
-      "Categoria de gasto dominante, despesas recorrentes e projeção de metas — calculado a partir das suas transações reais.",
-    color: "text-purple-400 bg-purple-400/10",
+      "Categoria de gasto dominante, despesas recorrentes e mudanças de comportamento — cada análise vem com a conta de onde veio o número, não só a conclusão.",
+    color: "text-ai-400 bg-ai-500/10",
   },
   {
     icon: Bell,
@@ -82,9 +82,9 @@ const DIFFERENTIATORS = [
   },
   {
     icon: WifiOff,
-    title: "Continua funcionando sem servidor",
+    title: "Continua funcionando sem conexão",
     description:
-      "Se o backend ficar indisponível, o sistema segue operando localmente no seu navegador até a conexão voltar.",
+      "Se você ficar sem conexão, o sistema segue operando localmente no seu navegador até a conexão voltar.",
   },
 ];
 
@@ -122,12 +122,12 @@ const FAQ = [
   {
     question: "Como os insights são gerados?",
     answer:
-      "A partir do histórico real das suas transações: categoria de gasto dominante, despesas recorrentes detectadas automaticamente e tendência mês a mês. Não são recomendações genéricas.",
+      "A partir do histórico real das suas transações: categoria de gasto dominante, despesas recorrentes e mudanças de comportamento mês a mês. Cada um vem com a comparação entre os períodos e o que mais contribuiu para a mudança — não são recomendações genéricas.",
   },
   {
     question: "O sistema funciona sem internet?",
     answer:
-      "Se o servidor ficar indisponível, o Finance.AI passa a funcionar localmente no seu navegador automaticamente, para você não ficar sem acesso.",
+      "Se você ficar sem conexão, o Finance.AI passa a funcionar localmente no seu navegador automaticamente, para você não ficar sem acesso.",
   },
   {
     question: "Funciona bem no celular?",
@@ -210,7 +210,7 @@ export default function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-10 sm:pb-14 text-center">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-10 sm:pb-14 text-center animate-fade-slide-up">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mb-6">
           <Sparkles size={13} />
           Controle financeiro pessoal com insights baseados no seu histórico real
@@ -279,8 +279,8 @@ export default function LandingPage() {
             </div>
             <div className="px-4 sm:px-6 pb-5">
               <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-purple-400/10 flex items-center justify-center shrink-0">
-                  <BrainCircuit size={18} className="text-purple-400" />
+                <div className="w-9 h-9 rounded-lg bg-ai-500/10 flex items-center justify-center shrink-0">
+                  <BrainCircuit size={18} className="text-ai-400" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold">Meta &quot;Viagem para o Nordeste&quot;</p>
@@ -290,7 +290,7 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
-        <p className="text-center text-xs text-zinc-600 mt-4">
+        <p className="text-center text-xs text-zinc-500 mt-4">
           Quer ver com dados reais sem criar conta?{" "}
           <button
             onClick={handleTryDemo}
@@ -343,10 +343,11 @@ export default function LandingPage() {
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {MODULES.map((feature) => (
+          {MODULES.map((feature, idx) => (
             <div
               key={feature.title}
-              className="p-5 sm:p-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 hover:bg-zinc-900/70 hover:border-zinc-700 transition-colors"
+              style={{ animationDelay: `${idx * 60}ms` }}
+              className="p-5 sm:p-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 hover:bg-zinc-900/70 hover:border-zinc-700 transition-colors animate-fade-slide-up"
             >
               <div
                 className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${feature.color}`}

@@ -89,7 +89,8 @@ src/
 - Transações: criar, editar, excluir, listar, exportar em CSV (respeitando o filtro de busca aplicado)
 - Metas: criar, depositar, concluir, excluir, com percentual de progresso
 - Dashboard com saldo, entradas, saídas e tendência mês a mês de cada um (calculados separadamente — antes um bug fazia o card de Entradas mostrar a variação de Saídas por engano)
-- Insights gerados a partir do histórico real: categoria de gasto dominante, despesas recorrentes detectadas automaticamente, pressão de fluxo de caixa, tendência de receita, projeção de tempo até concluir a próxima meta
+- Insights gerados a partir do histórico real: categoria de gasto dominante, despesas recorrentes detectadas automaticamente, pressão de fluxo de caixa, tendência de receita, mudança de comportamento por categoria (com explicabilidade: valor atual vs. anterior, diferença e principais responsáveis), resumo financeiro do mês, projeção de tempo até concluir a próxima meta
+- Importação de extrato (CSV e OFX pela API; só CSV também funciona no modo LocalStorage)
 - Notificações (lista, filtros, marcar como lida/todas como lidas)
 - Isolamento real de dados por conta — testado explicitamente com duas contas simultâneas
 
@@ -99,3 +100,4 @@ src/
 - [`docs/IDEIAS.md`](docs/IDEIAS.md) — próximas implementações sugeridas, por prioridade
 - [`docs/SEGURANCA.md`](docs/SEGURANCA.md) — o que já foi corrigido, o que ainda precisa de atenção antes de produção
 - [`docs/MELHORIAS.md`](docs/MELHORIAS.md) — mudanças mais recentes (layout mobile, exportar CSV, correção do toggle de IA, Configurações redesenhada) e por que cada uma foi feita
+- [`docs/MELHORIAS-CICLOS.md`](docs/MELHORIAS-CICLOS.md) — rodada seguinte: normalização de categoria, Insights com explicabilidade, importação CSV e tendências no modo LocalStorage, redesign de Insights e identidade visual da IA

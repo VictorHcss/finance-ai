@@ -2,12 +2,26 @@ import type {
   Transaction,
   Goal,
   InsightData,
+  InsightEntry,
   DashboardSummary,
   ChartDataPoint,
   UserProfile,
   UserSettings,
   AuthSession,
+  ImportPreviewResponse,
+  ImportPreviewRow,
+  ImportConfirmRow,
+  ImportConfirmResponse,
+  ImportBatchSummary,
+  MonthlySummary,
 } from "./api";
+import { formatCategoryLabel, normalizeCategoryKey, suggestCategory } from "./category";
+import { computeDedupeHash, normalizeDescription } from "./dedupe";
+import {
+  FileValidationError,
+  parseCsv,
+  validateCsvFile,
+} from "./csvImport";
 import {
   NotificationCategory,
   NotificationPriority,
@@ -29,6 +43,41 @@ const MONTH_NAMES = [
   "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
   "Jul", "Ago", "Set", "Out", "Nov", "Dez",
 ];
+
+// Registro interno de transação no modo local: além dos campos
+// públicos (Transaction), guarda metadados usados só para
+// deduplicação/importação — nunca expostos fora deste módulo além
+// do necessário (o objeto retornado ao chamador continua satisfazendo
+// o tipo `Transaction`, os campos extras é que habilitam checar
+// duplicidade em importações futuras, igual ao backend).
+type LocalTransactionRecord = Transaction & {
+  dedupe_hash?: string;
+  external_id?: string | null;
+  import_batch_id?: number;
+  original_description?: string;
+};
+
+type LocalImportBatch = {
+  id: number;
+  filename: string;
+  source: "csv";
+  status: "preview" | "completed";
+  total: number;
+  new_count: number;
+  duplicated_count: number;
+  error_count: number;
+  imported_count: number;
+  created_at: string;
+  completed_at?: string | null;
+};
+
+type LocalStagedRow = ImportPreviewRow & {
+  batch_id: number;
+  date_iso: string | null;
+  normalized_description: string | null;
+  dedupe_hash: string | null;
+  external_id: string | null;
+};
 
 type LocalUserRecord = {
   id: number;
@@ -54,6 +103,15 @@ function getLs(): Storage | null {
   } catch {
     return null;
   }
+}
+
+function readFileAsText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("Não foi possível ler o arquivo."));
+    reader.readAsText(file, "utf-8");
+  });
 }
 
 function userKey(userId: number, suffix: string): string {
@@ -152,13 +210,35 @@ function buildUserGoalsKey(userId: number): string {
 function buildUserNotificationsKey(userId: number): string {
   return userKey(userId, "notifications");
 }
-
-function loadTransactions(userId: number): Transaction[] {
-  return readLs<Transaction[]>(buildUserTransactionsKey(userId), []);
+function buildUserImportBatchesKey(userId: number): string {
+  return userKey(userId, "importBatches");
+}
+function buildUserStagedRowsKey(userId: number): string {
+  return userKey(userId, "importStagedRows");
 }
 
-function saveTransactions(userId: number, list: Transaction[]): void {
+function loadTransactions(userId: number): LocalTransactionRecord[] {
+  return readLs<LocalTransactionRecord[]>(buildUserTransactionsKey(userId), []);
+}
+
+function saveTransactions(userId: number, list: LocalTransactionRecord[]): void {
   writeLs(buildUserTransactionsKey(userId), list);
+}
+
+function loadImportBatches(userId: number): LocalImportBatch[] {
+  return readLs<LocalImportBatch[]>(buildUserImportBatchesKey(userId), []);
+}
+
+function saveImportBatches(userId: number, list: LocalImportBatch[]): void {
+  writeLs(buildUserImportBatchesKey(userId), list);
+}
+
+function loadStagedRows(userId: number): LocalStagedRow[] {
+  return readLs<LocalStagedRow[]>(buildUserStagedRowsKey(userId), []);
+}
+
+function saveStagedRows(userId: number, list: LocalStagedRow[]): void {
+  writeLs(buildUserStagedRowsKey(userId), list);
 }
 
 function loadGoals(userId: number): Goal[] {
@@ -178,23 +258,67 @@ function saveNotifications(userId: number, list: Notification[]): void {
   writeLs(buildUserNotificationsKey(userId), list);
 }
 
+/**
+ * Mesma regra do backend (`finance_service.get_dashboard_summary`),
+ * portada para o modo local: cada cartão (Saldo, Entradas, Saídas)
+ * tem sua própria tendência mês a mês — antes, os três campos de
+ * tendência sempre vinham fixos em 0 no LocalStorage.
+ */
 function computeDashboardSummary(txs: Transaction[]): DashboardSummary {
-  const incomes = txs
-    .filter((t) => t.type === "income")
-    .reduce((acc, t) => acc + (t.amount ?? 0), 0);
-  const expenses = txs
-    .filter((t) => t.type === "expense")
-    .reduce((acc, t) => acc + (t.amount ?? 0), 0);
-  const total = incomes - expenses;
-  const totalRef = Math.max(incomes, 1);
-  const expense_ratio = Math.round((expenses / totalRef) * 10000) / 100;
+  const incomes = round2(
+    txs.filter((t) => t.type === "income").reduce((acc, t) => acc + (t.amount ?? 0), 0),
+  );
+  const expenses = round2(
+    txs.filter((t) => t.type === "expense").reduce((acc, t) => acc + (t.amount ?? 0), 0),
+  );
+  const total = round2(incomes - expenses);
+
+  const monthlyBalance = new Map<string, number>();
+  const monthlyIncomes = new Map<string, number>();
+  const monthlyExpenses = new Map<string, number>();
+  for (const tx of txs) {
+    const monthKey = monthKeyOf(tx.date);
+    const amount = tx.amount ?? 0;
+    if (tx.type === "income") {
+      monthlyBalance.set(monthKey, (monthlyBalance.get(monthKey) ?? 0) + amount);
+      monthlyIncomes.set(monthKey, (monthlyIncomes.get(monthKey) ?? 0) + amount);
+    } else {
+      monthlyBalance.set(monthKey, (monthlyBalance.get(monthKey) ?? 0) - amount);
+      monthlyExpenses.set(monthKey, (monthlyExpenses.get(monthKey) ?? 0) + amount);
+    }
+  }
+
+  // Compara o mês mais recente com o mês anterior a ele — calculado
+  // separadamente pra saldo, entradas e saídas, pra cada cartão do
+  // Dashboard mostrar a própria variação (não a de despesas reaproveitada).
+  function monthOverMonthTrend(monthlyValues: Map<string, number>): number {
+    const ordered = Array.from(monthlyValues.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, v]) => v);
+    if (ordered.length < 2) return 0;
+    const prev = ordered[ordered.length - 2];
+    const curr = ordered[ordered.length - 1];
+    if (prev === 0) return 0;
+    return Math.round(((curr - prev) / Math.abs(prev)) * 1000) / 10;
+  }
+
+  const balance_trend_percentage = monthOverMonthTrend(monthlyBalance);
+  const income_trend_percentage = monthOverMonthTrend(monthlyIncomes);
+  const expense_trend_percentage = monthOverMonthTrend(monthlyExpenses);
+
+  // Igual ao backend: sem receita no período, o percentual comprometido
+  // não tem contra o que ser calculado (0), em vez do valor artificialmente
+  // alto que a fórmula anterior (dividindo por um denominador mínimo de 1)
+  // podia produzir.
+  const expense_ratio = incomes > 0 ? round2((expenses / incomes) * 100) : 0;
+
   return {
     incomes,
     expenses,
     total,
-    balance_trend_percentage: 0,
-    income_trend_percentage: 0,
-    expense_trend_percentage: 0,
+    balance_trend_percentage,
+    income_trend_percentage,
+    expense_trend_percentage,
     expense_ratio,
   };
 }
@@ -226,7 +350,31 @@ function computeChartData(txs: Transaction[]): ChartDataPoint[] {
   return Array.from(byMonth.values());
 }
 
-function computeInsights(txs: Transaction[]): InsightData | null {
+function monthKeyOf(dateStr: string): string {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function forecastEndOfMonth(currentValue: number, today: Date): number {
+  const day = today.getDate();
+  if (day <= 0) return round2(currentValue);
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const dailyAverage = currentValue / day;
+  return round2(dailyAverage * daysInMonth);
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * Mesma análise estatística do backend (`insight_service.py`), portada
+ * para o modo local/offline: categoria dominante, despesa recorrente,
+ * pressão de fluxo de caixa, tendência de receita, projeção de metas
+ * e risco de déficit — usando os dados reais já salvos neste
+ * navegador. Antes, o modo local sempre devolvia `insights: []`.
+ */
+function computeInsights(txs: Transaction[], goals: Goal[]): InsightData | null {
   const expenses = txs.filter((t) => t.type === "expense");
   if (expenses.length === 0) return null;
 
@@ -235,8 +383,7 @@ function computeInsights(txs: Transaction[]): InsightData | null {
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
   );
   for (const tx of sortedTxs) {
-    const d = new Date(tx.date);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const key = monthKeyOf(tx.date);
     byMonthMap.set(key, (byMonthMap.get(key) ?? 0) + (tx.amount ?? 0));
   }
 
@@ -249,7 +396,7 @@ function computeInsights(txs: Transaction[]): InsightData | null {
       const monthIndex = parseInt(m, 10) - 1;
       return {
         mes: `${MONTH_NAMES[monthIndex]}/${y.slice(2)}`,
-        valor: Math.round(valor * 100) / 100,
+        valor: round2(valor),
       };
     })
     .slice(-6);
@@ -257,9 +404,7 @@ function computeInsights(txs: Transaction[]): InsightData | null {
   if (historico.length === 0) return null;
 
   const values = historico.map((h) => h.valor);
-  const media_gastos = Math.round(
-    (values.reduce((a, b) => a + b, 0) / values.length) * 100,
-  ) / 100;
+  const media_gastos = round2(values.reduce((a, b) => a + b, 0) / values.length);
 
   let variacao_percentual = 0;
   if (values.length >= 2) {
@@ -267,9 +412,6 @@ function computeInsights(txs: Transaction[]): InsightData | null {
     const curr = values[values.length - 1];
     variacao_percentual = Math.round(((curr - prev) / prev) * 10000) / 100;
   }
-
-  const previsao_proximo_mes = Math.round(media_gastos * (1 + variacao_percentual / 100) * 100) / 100;
-  const economias_sugeridas = Math.round(media_gastos * 0.1 * 100) / 100;
 
   let alerta: string;
   if (variacao_percentual > 15) {
@@ -280,18 +422,261 @@ function computeInsights(txs: Transaction[]): InsightData | null {
     alerta = `Seus gastos estão estáveis (${variacao_percentual.toFixed(1)}% de variação). Continue acompanhando para manter o equilíbrio financeiro.`;
   }
 
+  // --- Análises por regra, mesma lógica do backend ---
+  const today = new Date();
+  const currentMonthKey = monthKeyOf(today.toISOString());
+  const previousMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const previousMonthKey = monthKeyOf(previousMonthDate.toISOString());
+
+  const monthlyExpenses = new Map<string, number>();
+  const monthlyIncomes = new Map<string, number>();
+  const monthlyCategoryExpenses = new Map<string, Map<string, number>>();
+  // [monthKey][categoryKey] -> Map(descriptionKey -> total) — só pra
+  // explicar (seção 12 do prompt) o insight de mudança de
+  // comportamento: quais descrições concretas empurraram o gasto.
+  const categoryDescriptionTotals = new Map<string, Map<string, Map<string, number>>>();
+  const categoryLabels = new Map<string, string>();
+  const recurringCounter = new Map<string, number>();
+  const recurringAmounts = new Map<string, number>();
+
+  for (const tx of txs) {
+    const monthKey = monthKeyOf(tx.date);
+    const amount = tx.amount ?? 0;
+
+    if (tx.type === "expense") {
+      const descKey = (tx.description ?? "").trim().toLowerCase();
+      const categoryKey = normalizeCategoryKey(tx.category);
+      if (!categoryLabels.has(categoryKey)) {
+        categoryLabels.set(categoryKey, formatCategoryLabel(tx.category));
+      }
+
+      monthlyExpenses.set(monthKey, (monthlyExpenses.get(monthKey) ?? 0) + amount);
+      const catMap = monthlyCategoryExpenses.get(monthKey) ?? new Map<string, number>();
+      catMap.set(categoryKey, (catMap.get(categoryKey) ?? 0) + amount);
+      monthlyCategoryExpenses.set(monthKey, catMap);
+
+      const catDescMap = categoryDescriptionTotals.get(monthKey) ?? new Map<string, Map<string, number>>();
+      const descMap = catDescMap.get(categoryKey) ?? new Map<string, number>();
+      descMap.set(descKey, (descMap.get(descKey) ?? 0) + amount);
+      catDescMap.set(categoryKey, descMap);
+      categoryDescriptionTotals.set(monthKey, catDescMap);
+
+      recurringCounter.set(descKey, (recurringCounter.get(descKey) ?? 0) + 1);
+      recurringAmounts.set(descKey, (recurringAmounts.get(descKey) ?? 0) + amount);
+    } else {
+      monthlyIncomes.set(monthKey, (monthlyIncomes.get(monthKey) ?? 0) + amount);
+    }
+  }
+
+  const currentExpenses = monthlyExpenses.get(currentMonthKey) ?? 0;
+  const currentIncomes = monthlyIncomes.get(currentMonthKey) ?? 0;
+  const previousIncomes = monthlyIncomes.get(previousMonthKey) ?? 0;
+
+  const forecastExpenses = forecastEndOfMonth(currentExpenses, today);
+  const previsao_proximo_mes = round2(Math.max(forecastExpenses, media_gastos));
+  const economias_sugeridas = round2(Math.max(currentExpenses - media_gastos, 0) * 0.35);
+
+  const insights: InsightEntry[] = [];
+
+  const currentCategoryMap = monthlyCategoryExpenses.get(currentMonthKey);
+  if (currentCategoryMap && currentCategoryMap.size > 0) {
+    let topKey: string | null = null;
+    let topTotal = 0;
+    for (const [key, total] of currentCategoryMap.entries()) {
+      if (topKey === null || total > topTotal) {
+        topKey = key;
+        topTotal = total;
+      }
+    }
+    if (topKey) {
+      const label = categoryLabels.get(topKey) ?? topKey;
+      const share = currentExpenses > 0 ? (topTotal / currentExpenses) * 100 : 0;
+      insights.push({
+        id: "top-category",
+        type: "expense",
+        severity: share >= 35 ? "high" : "medium",
+        title: "Categoria dominante de gasto",
+        message: `${label} concentrou ${share.toFixed(0)}% das saídas do mês, somando R$ ${topTotal.toFixed(2)}.`,
+        metric_label: "Maior categoria",
+        metric_value: label,
+      });
+    }
+  }
+
+  // Análise de comportamento: qual categoria mais aumentou de gasto em
+  // relação ao mês anterior, com explicabilidade — só gera quando há
+  // base no mês anterior pra comparar (evita "falsa precisão").
+  const previousCategoryMap = monthlyCategoryExpenses.get(previousMonthKey);
+  if (currentCategoryMap && previousCategoryMap) {
+    let behaviorKey: string | null = null;
+    let behaviorDiff = 0;
+    let behaviorCurrent = 0;
+    let behaviorPrevious = 0;
+    for (const [key, currentAmount] of currentCategoryMap.entries()) {
+      const previousAmount = previousCategoryMap.get(key) ?? 0;
+      if (previousAmount <= 0) continue;
+      const diff = currentAmount - previousAmount;
+      if (diff > behaviorDiff) {
+        behaviorDiff = diff;
+        behaviorKey = key;
+        behaviorCurrent = currentAmount;
+        behaviorPrevious = previousAmount;
+      }
+    }
+    if (behaviorKey) {
+      const label = categoryLabels.get(behaviorKey) ?? behaviorKey;
+      const percentage = (behaviorDiff / behaviorPrevious) * 100;
+      const contributorsMap = categoryDescriptionTotals.get(currentMonthKey)?.get(behaviorKey) ?? new Map();
+      const topContributors = Array.from(contributorsMap.entries())
+        .sort(([, a], [, b]) => (b as number) - (a as number))
+        .slice(0, 3)
+        .map(([desc, value]) => ({
+          label: (desc as string).replace(/\b\w/g, (c) => c.toUpperCase()),
+          value: round2(value as number),
+        }));
+      insights.push({
+        id: "category-behavior-change",
+        type: "expense",
+        severity: percentage >= 30 ? "high" : "medium",
+        title: "Mudança de comportamento detectada",
+        message: `Seus gastos com ${label} aumentaram ${percentage.toFixed(0)}% em relação ao mês anterior.`,
+        metric_label: "Categoria",
+        metric_value: label,
+        explanation: {
+          current_period_label: "Este mês",
+          previous_period_label: "Mês anterior",
+          current_value: round2(behaviorCurrent),
+          previous_value: round2(behaviorPrevious),
+          difference: round2(behaviorDiff),
+          percentage: Math.round(percentage * 10) / 10,
+          top_contributors: topContributors,
+        },
+      });
+    }
+  }
+
+  const recurringItems = Array.from(recurringAmounts.entries())
+    .filter(([label]) => (recurringCounter.get(label) ?? 0) >= 2)
+    .sort(([, a], [, b]) => b - a);
+  if (recurringItems.length > 0) {
+    const [recurringLabel, recurringTotal] = recurringItems[0];
+    const count = recurringCounter.get(recurringLabel) ?? 0;
+    const displayLabel = recurringLabel.replace(/\b\w/g, (c) => c.toUpperCase());
+    insights.push({
+      id: "recurring-expense",
+      type: "expense",
+      severity: "medium",
+      title: "Despesa recorrente detectada",
+      message: `'${displayLabel}' apareceu ${count} vezes e já consumiu R$ ${recurringTotal.toFixed(2)}.`,
+      metric_label: "Recorrência",
+      metric_value: String(count),
+    });
+  }
+
+  if (currentIncomes > 0) {
+    const fixedRatio = (currentExpenses / currentIncomes) * 100;
+    insights.push({
+      id: "cashflow-health",
+      type: "cashflow",
+      severity: fixedRatio >= 85 ? "high" : fixedRatio >= 70 ? "medium" : "low",
+      title: "Pressão no fluxo de caixa",
+      message: `Seus gastos consumiram ${fixedRatio.toFixed(0)}% da receita do mês. O saldo disponível atual é de R$ ${Math.max(currentIncomes - currentExpenses, 0).toFixed(2)}.`,
+      metric_label: "Comprometimento",
+      metric_value: `${fixedRatio.toFixed(0)}%`,
+    });
+  }
+
+  if (previousIncomes > 0) {
+    const incomeGrowth = ((currentIncomes - previousIncomes) / previousIncomes) * 100;
+    insights.push({
+      id: "income-trend",
+      type: "income",
+      severity: incomeGrowth >= 0 ? "low" : "medium",
+      title: "Tendência de receitas",
+      message: `As receitas variaram ${incomeGrowth.toFixed(1)}% em relação ao mês anterior.`,
+      metric_label: "Receita atual",
+      metric_value: `R$ ${currentIncomes.toFixed(2)}`,
+    });
+  }
+
+  const availableMonthlySavings = Math.max(currentIncomes - currentExpenses, 0);
+  const activeGoals = goals.filter((g) => !g.completed);
+  if (activeGoals.length > 0) {
+    const nextGoal = activeGoals.reduce((best, g) =>
+      Math.max(g.target - g.current, 0) < Math.max(best.target - best.current, 0) ? g : best,
+    );
+    const missing = Math.max(nextGoal.target - nextGoal.current, 0);
+    let message: string;
+    let severity: "low" | "medium" | "high";
+    let metricValue: string;
+    if (availableMonthlySavings > 0) {
+      const estimatedMonths = missing / availableMonthlySavings;
+      message = `No ritmo atual, a meta '${nextGoal.goal_name}' pode ser concluída em aproximadamente ${Math.max(1, Math.round(estimatedMonths))} meses.`;
+      severity = estimatedMonths <= 6 ? "low" : "medium";
+      metricValue = `R$ ${availableMonthlySavings.toFixed(2)}/mês`;
+    } else {
+      message = `A meta '${nextGoal.goal_name}' está sem folga mensal disponível; há risco de atraso se o padrão atual continuar.`;
+      severity = "high";
+      metricValue = "Sem folga";
+    }
+    insights.push({
+      id: "goal-forecast",
+      type: "goal",
+      severity,
+      title: "Projeção de metas",
+      message,
+      metric_label: "Capacidade mensal",
+      metric_value: metricValue,
+    });
+  }
+
+  if (forecastExpenses > currentIncomes && currentIncomes > 0) {
+    insights.push({
+      id: "deficit-risk",
+      type: "risk",
+      severity: "high",
+      title: "Risco de déficit",
+      message: `Se o ritmo de saídas continuar, o mês pode fechar em R$ ${forecastExpenses.toFixed(2)} de despesas, acima da receita atual.`,
+      metric_label: "Previsão",
+      metric_value: `R$ ${forecastExpenses.toFixed(2)}`,
+    });
+  }
+
+  // Resumo financeiro mensal — mesma regra do backend, funciona igual
+  // no LocalStorage.
+  const topCategoriesMonth = currentCategoryMap
+    ? Array.from(currentCategoryMap.entries())
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 3)
+        .map(([key, total]) => ({
+          category: categoryLabels.get(key) ?? key,
+          total: round2(total),
+          percentage: currentExpenses > 0 ? Math.round((total / currentExpenses) * 1000) / 10 : 0,
+        }))
+    : [];
+  const [currentYear, currentMonthNum] = currentMonthKey.split("-");
+  const resumo_mensal: MonthlySummary = {
+    month_label: `${MONTH_NAMES[parseInt(currentMonthNum, 10) - 1]}/${currentYear.slice(2)}`,
+    incomes: round2(currentIncomes),
+    expenses: round2(currentExpenses),
+    balance: round2(currentIncomes - currentExpenses),
+    top_categories: topCategoriesMonth,
+    income_trend_percentage:
+      previousIncomes > 0
+        ? Math.round(((currentIncomes - previousIncomes) / previousIncomes) * 1000) / 10
+        : 0,
+    expense_trend_percentage: variacao_percentual,
+  };
+
   return {
-    alerta,
+    alerta: insights.length > 0 ? insights[0].message : alerta,
     previsao_proximo_mes,
     economias_sugeridas,
     media_gastos,
     variacao_percentual,
     historico,
-    // O modo local (offline) não replica a análise estatística rica
-    // do backend (categoria dominante, recorrência, fluxo de caixa).
-    // A tela já trata array vazio mostrando uma mensagem apropriada,
-    // em vez de inventar sugestões que não vieram de dado real.
-    insights: [],
+    insights: insights.slice(0, 6),
+    resumo_mensal,
   };
 }
 
@@ -495,13 +880,21 @@ const localStorageBackend = {
   async createTransaction(data: Partial<Transaction>): Promise<Transaction> {
     const userId = requireCurrentUserId();
     const list = loadTransactions(userId);
-    const record: Transaction = {
+    const description = data.description ?? "Sem descrição";
+    const amount = Number(data.amount) || 0;
+    const type = data.type === "expense" ? "expense" : "income";
+    const date = data.date ?? new Date().toISOString();
+    const record: LocalTransactionRecord = {
       id: nextId(list),
-      description: data.description ?? "Sem descrição",
-      amount: Number(data.amount) || 0,
-      type: data.type === "expense" ? "expense" : "income",
+      description,
+      amount,
+      type,
       category: data.category ?? "Outros",
-      date: data.date ?? new Date().toISOString(),
+      date,
+      // Mesmo hash de deduplicação calculado pelo backend em toda
+      // transação (manual ou importada) — permite que uma futura
+      // importação reconheça esta transação como já existente.
+      dedupe_hash: computeDedupeHash(date, normalizeDescription(description), amount, type),
     };
     list.push(record);
     saveTransactions(userId, list);
@@ -615,7 +1008,7 @@ const localStorageBackend = {
         insights: [],
       };
     }
-    const result = computeInsights(loadTransactions(userId));
+    const result = computeInsights(loadTransactions(userId), loadGoals(userId));
     return result ? { ...result, ai_enabled: true } : result;
   },
 
@@ -624,12 +1017,219 @@ const localStorageBackend = {
     return computeChartData(loadTransactions(userId));
   },
 
+  // --- Importação de extrato (CSV) ---
+  async previewImport(file: File): Promise<ImportPreviewResponse> {
+    const userId = requireCurrentUserId();
+
+    const filename = file.name;
+    const content = await readFileAsText(file);
+
+    try {
+      validateCsvFile(filename, content);
+    } catch (err) {
+      if (err instanceof FileValidationError) {
+        throw new Error(err.message);
+      }
+      throw err;
+    }
+
+    const { parsed, issues } = parseCsv(content);
+    if (parsed.length === 0 && issues.length === 0) {
+      throw new Error("O arquivo está vazio.");
+    }
+
+    const batches = loadImportBatches(userId);
+    const batchId = nextId(batches);
+
+    const existingTransactions = loadTransactions(userId);
+    const existingExternalIds = new Set(
+      existingTransactions.map((t) => t.external_id).filter((v): v is string => !!v),
+    );
+    const existingHashes = new Set(
+      existingTransactions.map((t) => t.dedupe_hash).filter((v): v is string => !!v),
+    );
+
+    const seenExternalIds = new Set<string>();
+    const seenHashes = new Set<string>();
+
+    const stagedRows: LocalStagedRow[] = [];
+    let rowId = 1;
+
+    for (const row of parsed) {
+      const normalized = normalizeDescription(row.description);
+      const rowHash = computeDedupeHash(row.date, normalized, row.amount, row.type);
+
+      let isDuplicate: boolean;
+      if (row.external_id) {
+        isDuplicate = existingExternalIds.has(row.external_id) || seenExternalIds.has(row.external_id);
+      } else {
+        isDuplicate = existingHashes.has(rowHash) || seenHashes.has(rowHash);
+      }
+
+      const category = suggestCategory(row.description, normalized);
+
+      stagedRows.push({
+        id: rowId++,
+        batch_id: batchId,
+        date: row.date,
+        date_iso: row.date,
+        description: row.description,
+        amount: row.amount,
+        type: row.type,
+        category,
+        category_source: category ? "rule" : "none",
+        status: isDuplicate ? "duplicated" : "new",
+        error_reason: null,
+        normalized_description: normalized,
+        dedupe_hash: rowHash,
+        external_id: row.external_id,
+      });
+
+      if (row.external_id) seenExternalIds.add(row.external_id);
+      seenHashes.add(rowHash);
+    }
+
+    for (const issue of issues) {
+      stagedRows.push({
+        id: rowId++,
+        batch_id: batchId,
+        date: null,
+        date_iso: null,
+        description: (issue.raw || "(linha não interpretada)").slice(0, 120),
+        amount: null,
+        type: null,
+        category: null,
+        category_source: "none",
+        status: "error",
+        error_reason: issue.reason,
+        normalized_description: null,
+        dedupe_hash: null,
+        external_id: null,
+      });
+    }
+
+    const newCount = stagedRows.filter((r) => r.status === "new").length;
+    const duplicatedCount = stagedRows.filter((r) => r.status === "duplicated").length;
+    const errorCount = stagedRows.filter((r) => r.status === "error").length;
+
+    batches.push({
+      id: batchId,
+      filename,
+      source: "csv",
+      status: "preview",
+      total: stagedRows.length,
+      new_count: newCount,
+      duplicated_count: duplicatedCount,
+      error_count: errorCount,
+      imported_count: 0,
+      created_at: new Date().toISOString(),
+      completed_at: null,
+    });
+    saveImportBatches(userId, batches);
+
+    const allStaged = loadStagedRows(userId).concat(stagedRows);
+    saveStagedRows(userId, allStaged);
+
+    return {
+      batch_id: batchId,
+      filename,
+      source: "csv",
+      total: stagedRows.length,
+      new: newCount,
+      duplicated: duplicatedCount,
+      errors: errorCount,
+      rows: stagedRows.map((r) => ({
+        id: r.id,
+        date: r.date,
+        description: r.description,
+        amount: r.amount,
+        type: r.type,
+        category: r.category,
+        category_source: r.category_source,
+        status: r.status,
+        error_reason: r.error_reason,
+      })),
+    };
+  },
+
+  async confirmImport(batchId: number, rows: ImportConfirmRow[]): Promise<ImportConfirmResponse> {
+    const userId = requireCurrentUserId();
+    const batches = loadImportBatches(userId);
+    const batch = batches.find((b) => b.id === batchId);
+    if (!batch) throw new Error("Importação não encontrada");
+    if (batch.status === "completed") throw new Error("Esta importação já foi confirmada");
+    if (rows.length === 0) throw new Error("Nenhuma movimentação selecionada para importar");
+
+    const allStaged = loadStagedRows(userId);
+    const stagedForBatch = new Map(
+      allStaged.filter((r) => r.batch_id === batchId).map((r) => [r.id, r]),
+    );
+    const overridesById = new Map(rows.map((r) => [r.staged_id, r]));
+
+    const transactions = loadTransactions(userId);
+    let imported = 0;
+    let skipped = 0;
+
+    for (const [stagedId, stagedRow] of stagedForBatch.entries()) {
+      const override = overridesById.get(stagedId);
+      if (!override) continue;
+      if (stagedRow.status !== "new" && stagedRow.status !== "duplicated") {
+        skipped += 1;
+        continue;
+      }
+
+      const record: LocalTransactionRecord = {
+        id: nextId(transactions),
+        description: override.description,
+        amount: stagedRow.amount ?? 0,
+        type: (stagedRow.type ?? "expense") as "income" | "expense",
+        category: formatCategoryLabel(override.category || "Sem categoria"),
+        date: stagedRow.date ?? new Date().toISOString(),
+        source: "import",
+        external_id: stagedRow.external_id,
+        dedupe_hash: stagedRow.dedupe_hash ?? undefined,
+        import_batch_id: batchId,
+        original_description: stagedRow.description,
+      };
+      transactions.push(record);
+      imported += 1;
+    }
+
+    skipped += rows.length - stagedForBatch.size;
+
+    if (imported === 0) {
+      throw new Error("Nenhuma das movimentações selecionadas pode ser importada");
+    }
+
+    saveTransactions(userId, transactions);
+
+    const batchIdx = batches.findIndex((b) => b.id === batchId);
+    batches[batchIdx] = {
+      ...batches[batchIdx],
+      status: "completed",
+      imported_count: imported,
+      completed_at: new Date().toISOString(),
+    };
+    saveImportBatches(userId, batches);
+
+    return { status: "success", batch_id: batchId, imported, skipped };
+  },
+
+  async getImportBatches(): Promise<ImportBatchSummary[]> {
+    const userId = requireCurrentUserId();
+    return [...loadImportBatches(userId)].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+  },
+
   async resetDatabase(): Promise<void> {
     const userId = getCurrentLocalUserId();
     if (userId !== null) {
       saveTransactions(userId, []);
       saveGoals(userId, []);
       saveNotifications(userId, []);
+      saveImportBatches(userId, []);
+      saveStagedRows(userId, []);
     }
   },
 };

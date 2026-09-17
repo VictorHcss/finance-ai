@@ -1,5 +1,10 @@
 # Melhorias — Setembro/2026
 
+> **Nota:** esta é a rodada mais antiga registrada. Para o que veio depois, ver
+> [`MELHORIAS-CICLOS.md`](MELHORIAS-CICLOS.md) (normalização de categoria, Insights com
+> explicabilidade, importação CSV e tendências no modo LocalStorage, redesign de Insights e
+> identidade visual da IA).
+
 Este documento explica, com detalhe técnico, tudo que foi alterado nesta rodada
 de trabalho no Finance.AI: o que foi corrigido, o que foi adicionado e por quê.
 Ele complementa — não substitui — a documentação já existente:

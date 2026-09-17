@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, Target } from "lucide-react";
 import { storage } from "@/lib/storage";
+import { useToast } from "@/contexts/ToastContext";
 
 interface NewGoalModalProps {
   onSuccess?: () => void;
@@ -13,6 +14,16 @@ export function NewGoalModal({ onSuccess }: NewGoalModalProps) {
   const [target, setTarget] = useState("");
   const [deadline, setDeadline] = useState("");
   const [loading, setLoading] = useState(false);
+  const { addToast } = useToast();
+
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setIsOpen(false);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -35,6 +46,7 @@ export function NewGoalModal({ onSuccess }: NewGoalModalProps) {
       if (onSuccess) onSuccess();
     } catch (err) {
       console.error("Erro ao criar meta:", err);
+      addToast("error", "Não foi possível criar a meta agora. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -53,11 +65,14 @@ export function NewGoalModal({ onSuccess }: NewGoalModalProps) {
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-goal-modal-title"
         className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-t-2xl sm:rounded-2xl p-6 max-h-[90dvh] overflow-y-auto"
         style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
       >
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold">Definir Nova Meta</h2>
+          <h2 id="new-goal-modal-title" className="text-xl font-bold">Definir Nova Meta</h2>
           <button
             onClick={() => setIsOpen(false)}
             aria-label="Fechar"

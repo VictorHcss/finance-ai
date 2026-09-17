@@ -7,6 +7,7 @@ import type { Transaction } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/contexts/ToastContext";
 import { useHandleFetchError } from "@/hooks/useHandleFetchError";
+import { formatCategoryLabel } from "@/lib/category";
 
 function todayDateInputValue() {
   return new Date().toISOString().slice(0, 10);
@@ -96,7 +97,10 @@ export function NewTransactionModal() {
       description,
       amount: parsedAmount,
       type: type as "income" | "expense",
-      category,
+      // Mesma capitalização amigável aplicada pelo backend
+      // (app/schemas/finance.py) — mantém API e LocalStorage
+      // consistentes, sem depender de qual modo está ativo.
+      category: formatCategoryLabel(category),
       date,
     };
 
@@ -134,14 +138,19 @@ export function NewTransactionModal() {
     return (
       <button
         onClick={openForNew}
-        className="fixed right-5 bottom-5 sm:right-8 sm:bottom-8 flex items-center gap-2 px-4 py-4 md:px-6 md:py-4 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-semibold shadow-[0_10px_20px_rgba(27,175,128,0.25)] ring-1 ring-white/20 hover:shadow-[0_15px_30px_rgba(27,175,128,0.4)] hover:-translate-y-1 active:scale-95 transition-all duration-300 ease-out group z-40 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-zinc-950"
+        className="fixed right-5 bottom-5 sm:right-8 sm:bottom-8 flex items-center justify-center w-14 h-14 sm:w-auto sm:h-auto sm:justify-start sm:px-6 sm:py-4 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-semibold shadow-[0_10px_20px_rgba(27,175,128,0.25)] ring-1 ring-white/20 hover:shadow-[0_15px_30px_rgba(27,175,128,0.4)] hover:-translate-y-1 active:scale-95 transition-all duration-300 ease-out group z-40 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-zinc-950"
         style={{ marginBottom: "env(safe-area-inset-bottom)", marginRight: "env(safe-area-inset-right)" }}
         aria-label="Nova transação"
         title="Nova transação"
       >
-        <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300" />
+        <Plus size={22} className="shrink-0 group-hover:rotate-90 transition-transform duration-300" />
 
-        <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-500 ease-in-out whitespace-nowrap tracking-tight">
+        {/* Só desktop: em toque não existe estado de hover real, então
+            manter o rótulo escondido também no mobile evitava um "salto"
+            de layout ao tocar e — pelo gap do flex ficar reservado mesmo
+            com o texto de largura zero — descentralizava o ícone dentro
+            do botão redondo. */}
+        <span className="hidden sm:block max-w-0 overflow-hidden group-hover:max-w-xs group-hover:ml-2 transition-all duration-500 ease-in-out whitespace-nowrap tracking-tight">
           Nova Transação
         </span>
       </button>

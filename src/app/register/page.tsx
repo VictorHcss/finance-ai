@@ -3,9 +3,12 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
+import { storage } from "@/lib/storage";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Mail, Lock, User } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, Check, Loader2 } from "lucide-react";
+
+type SetupStep = "account" | "profile" | "insights" | "done";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -15,6 +18,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [setupStep, setSetupStep] = useState<SetupStep | null>(null);
   const { register, session, loading: authLoading } = useAuth();
   const { addToast } = useToast();
   const router = useRouter();
@@ -39,19 +43,38 @@ export default function RegisterPage() {
     }
 
     setLoading(true);
+    setSetupStep("account");
 
     try {
       await register(name, email, password);
+      setSetupStep("profile");
+
+      // Não é só decoração: aqui a tela já busca de verdade o resumo e
+      // os insights que o Dashboard vai mostrar em seguida — pra quando
+      // o usuário chegar lá, na maioria das vezes os dados já estejam
+      // prontos, em vez de mostrar outro carregamento na sequência.
+      setSetupStep("insights");
+      await Promise.all([
+        storage.getSummary().catch(() => null),
+        storage.getInsights().catch(() => null),
+      ]);
+
+      setSetupStep("done");
       addToast("success", "Conta criada com sucesso!");
       router.push("/dashboard");
     } catch {
       addToast("error", "Erro ao criar conta. Tente novamente.");
+      setSetupStep(null);
     } finally {
       setLoading(false);
     }
   };
 
   if (authLoading || session) return null;
+
+  if (setupStep) {
+    return <PostRegisterSetup step={setupStep} />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-6">
@@ -241,6 +264,68 @@ export default function RegisterPage() {
               </Link>
             </p>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const SETUP_STEPS: { key: SetupStep; label: string }[] = [
+  { key: "account", label: "Conta criada" },
+  { key: "profile", label: "Perfil configurado" },
+  { key: "insights", label: "Preparando suas análises" },
+];
+
+/**
+ * Tela exibida entre o cadastro e o Dashboard. Cada item reflete um
+ * passo que realmente aconteceu (ou está acontecendo) — "Preparando
+ * suas análises" corresponde à busca real do resumo e dos insights
+ * que o Dashboard vai exibir em seguida, não é só uma animação.
+ */
+function PostRegisterSetup({ step }: { step: SetupStep }) {
+  const currentIndex = SETUP_STEPS.findIndex((s) => s.key === step);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6">
+      <div className="w-full max-w-sm text-center space-y-8">
+        <div>
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/20 ring-1 ring-white/10">
+            <span className="text-black font-bold text-lg sm:text-xl">$</span>
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-emerald-500 tracking-tight">
+            Finance.AI
+          </h1>
+          <p className="text-zinc-400 text-sm mt-1">Preparando seu espaço...</p>
+        </div>
+
+        <div className="space-y-3 text-left bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-5">
+          {SETUP_STEPS.map((s, idx) => {
+            const isDone = idx < currentIndex || step === "done";
+            const isActive = idx === currentIndex && step !== "done";
+            return (
+              <div key={s.key} className="flex items-center gap-3">
+                <span
+                  className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
+                    isDone
+                      ? "bg-emerald-500 text-black"
+                      : isActive
+                        ? "border-2 border-emerald-500"
+                        : "border-2 border-zinc-700"
+                  }`}
+                >
+                  {isDone && <Check size={12} strokeWidth={3} />}
+                  {isActive && <Loader2 size={12} className="animate-spin text-emerald-500" />}
+                </span>
+                <span
+                  className={`text-sm ${
+                    isDone ? "text-zinc-300" : isActive ? "text-zinc-200 font-medium" : "text-zinc-500"
+                  }`}
+                >
+                  {s.label}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

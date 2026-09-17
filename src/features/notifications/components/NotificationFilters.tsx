@@ -102,7 +102,7 @@ export function NotificationFilters({
 
   const categoryOptions = useMemo<SelectOption<NotificationCategory>[]>(() => {
     return [
-      { value: undefined, label: "Todas categorias" },
+      { value: undefined, label: "Todas as categorias" },
       ...Object.values(NotificationCategory).map((value) => ({
         value,
         label: NOTIFICATION_CATEGORY_LABEL[value],
@@ -112,7 +112,7 @@ export function NotificationFilters({
 
   const priorityOptions = useMemo<SelectOption<NotificationPriority>[]>(() => {
     return [
-      { value: undefined, label: "Todas prioridades" },
+      { value: undefined, label: "Todas as prioridades" },
       ...Object.values(NotificationPriority).map((value) => ({
         value,
         label: NOTIFICATION_PRIORITY_LABEL[value],
@@ -122,7 +122,7 @@ export function NotificationFilters({
 
   const statusOptions = useMemo<SelectOption<NotificationStatus>[]>(() => {
     return [
-      { value: undefined, label: "Todos status" },
+      { value: undefined, label: "Todos os status" },
       ...Object.values(NotificationStatus).map((value) => ({
         value,
         label: NOTIFICATION_STATUS_LABEL[value],

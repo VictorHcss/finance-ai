@@ -14,9 +14,8 @@ import {
 import { AppLayout } from "@/components/AppLayout";
 import { useToast } from "@/contexts/ToastContext";
 import { useHandleFetchError } from "@/hooks/useHandleFetchError";
-import { getStorageMode, subscribeStorageMode, type StorageMode } from "@/lib/storage";
+import { getStorageMode, subscribeStorageMode, storage, type StorageMode } from "@/lib/storage";
 import {
-  api,
   type ImportBatchSummary,
   type ImportPreviewResponse,
   type ImportPreviewRow,
@@ -64,10 +63,9 @@ export default function ImportTransactionsPage() {
   useEffect(() => subscribeStorageMode(setStorageMode), []);
 
   const loadBatches = useCallback(async () => {
-    if (storageMode !== "api") return;
     setLoadingBatches(true);
     try {
-      const data = await api.getImportBatches();
+      const data = await storage.getImportBatches();
       setBatches(data);
     } catch {
       // Histórico é um extra — se falhar, a tela de importação
@@ -75,7 +73,7 @@ export default function ImportTransactionsPage() {
     } finally {
       setLoadingBatches(false);
     }
-  }, [storageMode]);
+  }, []);
 
   useEffect(() => {
     loadBatches();
@@ -95,10 +93,18 @@ export default function ImportTransactionsPage() {
       return;
     }
 
+    if (storageMode === "local" && /\.ofx$/i.test(file.name)) {
+      addToast(
+        "error",
+        "Arquivos .ofx ainda exigem conexão com a internet. No modo offline, use um extrato .csv.",
+      );
+      return;
+    }
+
     setUploading(true);
     setResult(null);
     try {
-      const data = await api.previewImport(file);
+      const data = await storage.previewImport(file);
       setPreview(data);
 
       const initialEdits: Record<number, RowEdit> = {};
@@ -150,9 +156,13 @@ export default function ImportTransactionsPage() {
 
     setConfirming(true);
     try {
-      const response = await api.confirmImport(preview.batch_id, rows);
+      const response = await storage.confirmImport(preview.batch_id, rows);
       setResult({ imported: response.imported, skipped: response.skipped });
-      addToast("success", `${response.imported} transação(ões) importada(s) com sucesso.`);
+      const count = response.imported;
+      addToast(
+        "success",
+        count === 1 ? "1 transação importada com sucesso." : `${count} transações importadas com sucesso.`,
+      );
       window.dispatchEvent(new Event("transactions-changed"));
       loadBatches();
     } catch (err) {
@@ -165,28 +175,32 @@ export default function ImportTransactionsPage() {
   if (storageMode === "local") {
     return (
       <AppLayout>
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-8 text-center space-y-3">
-            <AlertTriangle className="mx-auto text-amber-400" size={32} />
-            <h1 className="text-xl font-bold">Importação indisponível no modo local</h1>
-            <p className="text-zinc-400 text-sm">
-              A importação de extrato precisa do backend do Finance.ai para interpretar o
-              arquivo com segurança. No momento você está no modo offline (dados salvos só
-              neste navegador). Conecte-se ao backend e tente novamente.
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-start gap-3 text-sm text-amber-200">
+            <AlertTriangle className="shrink-0 mt-0.5" size={18} />
+            <p>
+              Você está no modo offline (dados salvos só neste navegador). Extratos <strong>.csv</strong>{" "}
+              funcionam normalmente aqui; arquivos <strong>.ofx</strong> ainda exigem conexão com a
+              internet.
             </p>
           </div>
+          {renderImportBody()}
         </div>
       </AppLayout>
     );
   }
 
-  return (
-    <AppLayout>
+  return <AppLayout>{renderImportBody()}</AppLayout>;
+
+  function renderImportBody() {
+    return (
       <div className="max-w-4xl mx-auto space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Importar extrato</h1>
           <p className="text-zinc-400">
-            Envie o extrato baixado do seu banco em CSV ou OFX — nada é salvo até você revisar e confirmar.
+            {storageMode === "local"
+              ? "Envie o extrato baixado do seu banco em CSV — nada é salvo até você revisar e confirmar."
+              : "Envie o extrato baixado do seu banco em CSV ou OFX — nada é salvo até você revisar e confirmar."}
           </p>
         </div>
 
@@ -223,14 +237,16 @@ export default function ImportTransactionsPage() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv,.ofx"
+                  accept={storageMode === "local" ? ".csv" : ".csv,.ofx"}
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) handleFile(file);
                   }}
                 />
-                <p className="text-zinc-600 text-xs mt-4">Formatos: CSV e OFX</p>
+                <p className="text-zinc-500 text-xs mt-4">
+                  {storageMode === "local" ? "Formato: CSV" : "Formatos: CSV e OFX"}
+                </p>
               </>
             )}
           </div>
@@ -248,18 +264,18 @@ export default function ImportTransactionsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-center">
-                <p className="text-2xl font-bold text-emerald-400">{preview.new}</p>
-                <p className="text-xs text-zinc-500 mt-1">Novas</p>
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 sm:p-4 text-center">
+                <p className="text-xl sm:text-2xl font-bold text-emerald-400">{preview.new}</p>
+                <p className="text-[11px] sm:text-xs text-zinc-500 mt-1">Novas</p>
               </div>
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-center">
-                <p className="text-2xl font-bold text-amber-400">{preview.duplicated}</p>
-                <p className="text-xs text-zinc-500 mt-1">Duplicadas</p>
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 sm:p-4 text-center">
+                <p className="text-xl sm:text-2xl font-bold text-amber-400">{preview.duplicated}</p>
+                <p className="text-[11px] sm:text-xs text-zinc-500 mt-1">Duplicadas</p>
               </div>
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-center">
-                <p className="text-2xl font-bold text-red-400">{preview.errors}</p>
-                <p className="text-xs text-zinc-500 mt-1">Com problemas</p>
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 sm:p-4 text-center">
+                <p className="text-xl sm:text-2xl font-bold text-red-400">{preview.errors}</p>
+                <p className="text-[11px] sm:text-xs text-zinc-500 mt-1">Com problemas</p>
               </div>
             </div>
 
@@ -290,6 +306,7 @@ export default function ImportTransactionsPage() {
                               disabled={isError}
                               checked={edit?.included ?? false}
                               onChange={(e) => updateEdit(row.id, { included: e.target.checked })}
+                              aria-label={`Incluir na importação: ${row.description}`}
                               className="rounded border-zinc-700 bg-zinc-800 text-emerald-500 focus:ring-emerald-500/40 disabled:opacity-30"
                             />
                           </td>
@@ -303,6 +320,7 @@ export default function ImportTransactionsPage() {
                               <input
                                 value={edit?.description ?? ""}
                                 onChange={(e) => updateEdit(row.id, { description: e.target.value })}
+                                aria-label={`Descrição da transação: ${row.description}`}
                                 className="w-full bg-transparent border-b border-transparent hover:border-zinc-700 focus:border-emerald-500 focus:outline-none py-0.5"
                               />
                             )}
@@ -315,6 +333,7 @@ export default function ImportTransactionsPage() {
                                 value={edit?.category ?? ""}
                                 placeholder="Sem categoria"
                                 onChange={(e) => updateEdit(row.id, { category: e.target.value })}
+                                aria-label={`Categoria da transação: ${row.description}`}
                                 className="w-full bg-transparent border-b border-transparent hover:border-zinc-700 focus:border-emerald-500 focus:outline-none py-0.5 placeholder:text-zinc-600"
                               />
                             )}
@@ -338,7 +357,7 @@ export default function ImportTransactionsPage() {
                               {badge.label}
                             </span>
                             {isError && row.error_reason && (
-                              <p className="text-xs text-zinc-600 mt-1">{row.error_reason}</p>
+                              <p className="text-xs text-zinc-400 mt-1">{row.error_reason}</p>
                             )}
                           </td>
                         </tr>
@@ -351,9 +370,16 @@ export default function ImportTransactionsPage() {
 
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4">
               <p className="text-sm text-zinc-400">
-                <span className="font-semibold text-zinc-200">{includedCount}</span> transação
-                {includedCount === 1 ? "" : "ões"} será{includedCount === 1 ? "" : "ão"} adicionada
-                {includedCount === 1 ? "" : "s"}.
+                {includedCount === 1 ? (
+                  <>
+                    <span className="font-semibold text-zinc-200">1</span> transação será adicionada.
+                  </>
+                ) : (
+                  <>
+                    <span className="font-semibold text-zinc-200">{includedCount}</span> transações serão
+                    adicionadas.
+                  </>
+                )}
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -381,8 +407,9 @@ export default function ImportTransactionsPage() {
             <div>
               <h2 className="text-xl font-bold">Importação concluída</h2>
               <p className="text-zinc-400 mt-1">
-                {result.imported} transação{result.imported === 1 ? "" : "ões"} adicionada
-                {result.imported === 1 ? "" : "s"} ao seu histórico.
+                {result.imported === 1
+                  ? "1 transação adicionada ao seu histórico."
+                  : `${result.imported} transações adicionadas ao seu histórico.`}
                 {result.skipped > 0 && ` ${result.skipped} não puderam ser importadas.`}
               </p>
             </div>
@@ -430,9 +457,9 @@ export default function ImportTransactionsPage() {
           </div>
         )}
         {loadingBatches && !preview && (
-          <p className="text-xs text-zinc-600 text-center">Carregando histórico de importações...</p>
+          <p className="text-xs text-zinc-500 text-center">Carregando histórico de importações...</p>
         )}
       </div>
-    </AppLayout>
-  );
+    );
+  }
 }

@@ -2,8 +2,10 @@
 import { useState } from "react";
 import { Calendar, CheckCircle2, Trash2, PlusCircle } from "lucide-react";
 import { storage } from "@/lib/storage";
+import { formatCurrency } from "@/lib/utils";
 import type { Goal } from "@/lib/api";
 import { AddValueModal } from "./AddValueModal";
+import { useToast } from "@/contexts/ToastContext";
 
 interface GoalCardProps {
   goal: Goal;
@@ -12,6 +14,7 @@ interface GoalCardProps {
 
 export function GoalCard({ goal, onUpdate }: GoalCardProps) {
   const [isAddValueOpen, setIsAddValueOpen] = useState(false);
+  const { addToast } = useToast();
   const isCompleted = goal.completed || goal.percent >= 100;
 
   async function handleComplete() {
@@ -20,16 +23,22 @@ export function GoalCard({ goal, onUpdate }: GoalCardProps) {
       onUpdate();
     } catch (err) {
       console.error(err);
+      addToast("error", "Não foi possível concluir a meta agora. Tente novamente.");
     }
   }
 
   async function handleDelete() {
-    if (confirm(`Tem certeza que deseja excluir a meta "${goal.goal_name}"?`)) {
+    if (
+      confirm(
+        `Excluir a meta "${goal.goal_name}" (alvo: ${formatCurrency(goal.target)})?\n\nEssa ação não pode ser desfeita.`,
+      )
+    ) {
       try {
         await storage.deleteGoal(goal.id);
         onUpdate();
       } catch (err) {
         console.error(err);
+        addToast("error", "Não foi possível excluir a meta agora. Tente novamente.");
       }
     }
   }

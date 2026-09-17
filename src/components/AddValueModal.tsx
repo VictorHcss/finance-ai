@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, DollarSign, Plus } from "lucide-react";
 import { storage } from "@/lib/storage";
+import { useToast } from "@/contexts/ToastContext";
 
 interface AddValueModalProps {
   goalId: number;
@@ -14,6 +15,16 @@ interface AddValueModalProps {
 export function AddValueModal({ goalId, goalName, isOpen, onClose, onSuccess }: AddValueModalProps) {
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
+  const { addToast } = useToast();
+
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -27,6 +38,7 @@ export function AddValueModal({ goalId, goalName, isOpen, onClose, onSuccess }: 
       onClose();
     } catch (err) {
       console.error("Erro ao adicionar valor:", err);
+      addToast("error", "Não foi possível adicionar o valor agora. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -37,12 +49,15 @@ export function AddValueModal({ goalId, goalName, isOpen, onClose, onSuccess }: 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-value-modal-title"
         className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl max-h-[90dvh] overflow-y-auto"
         style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
       >
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-xl font-bold text-white">Adicionar Valor</h2>
+            <h2 id="add-value-modal-title" className="text-xl font-bold text-white">Adicionar Valor</h2>
             <p className="text-zinc-500 text-xs mt-1">{goalName}</p>
           </div>
           <button

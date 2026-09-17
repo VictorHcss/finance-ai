@@ -19,7 +19,7 @@ export default function ForgotPasswordPage() {
     try {
       await storage.forgotPassword(email);
       setSent(true);
-      addToast("success", "E-mail de recuperação enviado (simulado)!");
+      addToast("success", "Link de recuperação enviado. Confira seu e-mail.");
     } catch {
       addToast("error", "Erro ao enviar e-mail. Tente novamente.");
     } finally {

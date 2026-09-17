@@ -9,6 +9,10 @@ import {
   type ChartDataPoint,
   type DashboardSummary,
   type Goal,
+  type ImportBatchSummary,
+  type ImportConfirmResponse,
+  type ImportConfirmRow,
+  type ImportPreviewResponse,
   type InsightData,
   type Transaction,
   type UserProfile,
@@ -330,6 +334,31 @@ export const storage = {
     fallbackRead(
       () => api.getChartData(),
       () => localStorageApi.getChartData(),
+    ),
+
+  // --- Importação de extrato ---
+  // Só CSV tem paridade no modo local por enquanto — OFX continua
+  // exigindo o backend (ver checagem de extensão em
+  // src/app/transactions/import/page.tsx).
+  previewImport: async (file: File): Promise<ImportPreviewResponse> =>
+    resolveWrite(
+      () => api.previewImport(file),
+      () => localStorageApi.previewImport(file),
+    ),
+
+  confirmImport: async (
+    batchId: number,
+    rows: ImportConfirmRow[],
+  ): Promise<ImportConfirmResponse> =>
+    resolveWrite(
+      () => api.confirmImport(batchId, rows),
+      () => localStorageApi.confirmImport(batchId, rows),
+    ),
+
+  getImportBatches: async (): Promise<ImportBatchSummary[]> =>
+    fallbackRead(
+      () => api.getImportBatches(),
+      () => localStorageApi.getImportBatches(),
     ),
 };
 

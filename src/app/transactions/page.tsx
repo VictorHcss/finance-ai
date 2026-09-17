@@ -10,6 +10,7 @@ import { useHandleFetchError } from "@/hooks/useHandleFetchError";
 import { useToast } from "@/contexts/ToastContext";
 import { downloadTransactionsCsv } from "@/lib/csv";
 import { formatCurrency } from "@/lib/utils";
+import { formatCategoryLabel, normalizeCategoryKey } from "@/lib/category";
 
 type SourceFilter = "all" | "manual" | "import";
 
@@ -52,10 +53,18 @@ export default function TransactionsPage() {
 
   // Lista de categorias que realmente existem no histórico, em vez de
   // uma lista fixa — assim o filtro sempre reflete o que o usuário
-  // cadastrou (ver docs/IDEIAS.md: categoria ainda é texto livre).
+  // cadastrou. Categoria é texto livre, então duas grafias da mesma
+  // categoria ("Alimentação" / "alimentação") são agrupadas numa única
+  // opção de filtro, usando a chave normalizada (ver src/lib/category.ts).
   const availableCategories = useMemo(() => {
-    const unique = new Set(transactions.map((t) => t.category));
-    return Array.from(unique).sort((a, b) => a.localeCompare(b, "pt-BR"));
+    const byKey = new Map<string, string>();
+    for (const t of transactions) {
+      const key = normalizeCategoryKey(t.category);
+      if (!byKey.has(key)) byKey.set(key, formatCategoryLabel(t.category));
+    }
+    return Array.from(byKey.entries())
+      .map(([key, label]) => ({ key, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   }, [transactions]);
 
   const hasActiveFilters =
@@ -85,7 +94,7 @@ export default function TransactionsPage() {
         const source = t.source ?? "manual";
         return source === sourceFilter;
       })
-      .filter((t) => categoryFilter === "all" || t.category === categoryFilter)
+      .filter((t) => categoryFilter === "all" || normalizeCategoryKey(t.category) === categoryFilter)
       .filter((t) => !dateFrom || t.date.slice(0, 10) >= dateFrom)
       .filter((t) => !dateTo || t.date.slice(0, 10) <= dateTo);
     setFilteredTransactions(filtered);
@@ -233,8 +242,8 @@ export default function TransactionsPage() {
             >
               <option value="all">Todas as categorias</option>
               {availableCategories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
+                <option key={category.key} value={category.key}>
+                  {category.label}
                 </option>
               ))}
             </select>
@@ -325,7 +334,7 @@ export default function TransactionsPage() {
                     <button
                       onClick={() => window.dispatchEvent(new CustomEvent("open-transaction-modal", { detail: t }))}
                       aria-label={`Editar transação ${t.description}`}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800 hover:text-emerald-500 transition-colors"
+                      className="flex h-11 w-11 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800 hover:text-emerald-500 transition-colors"
                     >
                       <Pencil size={16} />
                     </button>
@@ -333,7 +342,7 @@ export default function TransactionsPage() {
                       onClick={() => handleDelete(t)}
                       disabled={deletingId === t.id}
                       aria-label={`Excluir transação ${t.description}`}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-rose-500/10 hover:text-rose-500 transition-colors disabled:opacity-50"
+                      className="flex h-11 w-11 items-center justify-center rounded-lg text-zinc-500 hover:bg-rose-500/10 hover:text-rose-500 transition-colors disabled:opacity-50"
                     >
                       <Trash2 size={16} />
                     </button>

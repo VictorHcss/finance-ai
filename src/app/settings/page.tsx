@@ -154,7 +154,7 @@ export default function SettingsPage() {
                 </p>
                 <p className="text-sm text-zinc-500 truncate">{user?.email}</p>
                 {memberSince && (
-                  <p className="text-xs text-zinc-600 mt-0.5">
+                  <p className="text-xs text-zinc-500 mt-0.5">
                     Membro desde {memberSince}
                   </p>
                 )}
@@ -206,20 +206,36 @@ export default function SettingsPage() {
               <h3 className="font-bold">Notificações e IA</h3>
             </div>
             <div className="divide-y divide-zinc-800/70">
-              <ToggleItem
-                title="Alertas de Gastos Críticos"
-                description="Receber aviso quando ultrapassar 80% do orçamento."
-                checked={settings?.notifications_enabled ?? true}
-                disabled={!settings || savingSettings}
-                onToggle={() => handleToggle("notifications_enabled")}
-              />
-              <ToggleItem
-                title="Insights de IA"
-                description="Permite que o Dashboard e a tela de Insights analisem seu histórico para gerar previsões e sugestões. Desligado, as duas telas param de gerar novas análises."
-                checked={settings?.ai_enabled ?? true}
-                disabled={!settings || savingSettings}
-                onToggle={() => handleToggle("ai_enabled")}
-              />
+              {!settings ? (
+                <div className="py-4 space-y-3" aria-hidden="true">
+                  {[0, 1].map((i) => (
+                    <div key={i} className="flex items-center justify-between gap-4 py-1">
+                      <div className="space-y-2 flex-1">
+                        <div className="h-4 w-40 bg-zinc-800 rounded animate-pulse" />
+                        <div className="h-3 w-full max-w-xs bg-zinc-800/70 rounded animate-pulse" />
+                      </div>
+                      <div className="h-6 w-11 bg-zinc-800 rounded-full animate-pulse shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <ToggleItem
+                    title="Alertas de Gastos Críticos"
+                    description="Receber aviso quando ultrapassar 80% do orçamento."
+                    checked={settings?.notifications_enabled ?? true}
+                    disabled={savingSettings}
+                    onToggle={() => handleToggle("notifications_enabled")}
+                  />
+                  <ToggleItem
+                    title="Insights de IA"
+                    description="Permite que o Dashboard e a tela de Insights analisem seu histórico para gerar previsões e sugestões. Desligado, as duas telas param de gerar novas análises."
+                    checked={settings?.ai_enabled ?? true}
+                    disabled={savingSettings}
+                    onToggle={() => handleToggle("ai_enabled")}
+                  />
+                </>
+              )}
             </div>
           </section>
 
@@ -244,7 +260,7 @@ export default function SettingsPage() {
                 <p className="text-sm text-zinc-300 mt-0.5">Português (Brasil)</p>
               </div>
             </div>
-            <p className="text-xs text-zinc-600">
+            <p className="text-xs text-zinc-500">
               Suporte a múltiplas moedas e idiomas está no radar — por enquanto, todo valor é exibido em BRL.
             </p>
           </section>

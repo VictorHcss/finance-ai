@@ -80,7 +80,7 @@ export default function PlanningPage() {
 
           <h2 className="text-lg font-bold mt-2 text-emerald-400 truncate">
             {goals.length > 0
-              ? goals.sort((a, b) => b.percent - a.percent)[0].goal_name
+              ? [...goals].sort((a, b) => b.percent - a.percent)[0].goal_name
               : "Nenhuma"}
           </h2>
         </div>
