@@ -34,6 +34,10 @@ export type Transaction = {
   type: "income" | "expense";
   category: string;
   date: string;
+  /** "import" para transações vindas de importação de extrato (CSV/OFX);
+      "manual" (ou ausente, em respostas antigas/modo local) para as
+      demais. Nunca setado pelo cliente — só o backend atribui. */
+  source?: "manual" | "import";
 };
 
 export type Goal = {
@@ -60,6 +64,12 @@ export type InsightEntry = {
 };
 
 export type InsightData = {
+  /** false quando o usuário desligou "Insights Semanais da IA" em
+      Configurações — nesse caso os demais campos vêm zerados/vazios
+      e a tela deve mostrar um estado próprio, não tratar como "sem
+      dados ainda". Ausente (undefined) em respostas antigas/modo
+      local antes desta função existir — trate como true. */
+  ai_enabled?: boolean;
   alerta: string;
   previsao_proximo_mes: number;
   economias_sugeridas: number;
@@ -110,6 +120,59 @@ export type AuthSession = {
   session_token: string;
   user: UserProfile;
   expires_at: string;
+};
+
+export type ImportSourceFormat = "csv" | "ofx";
+export type ImportRowStatus = "new" | "duplicated" | "error";
+
+export type ImportPreviewRow = {
+  id: number;
+  date: string | null;
+  description: string;
+  amount: number | null;
+  type: "income" | "expense" | null;
+  category: string | null;
+  category_source: "rule" | "none";
+  status: ImportRowStatus;
+  error_reason: string | null;
+};
+
+export type ImportPreviewResponse = {
+  batch_id: number;
+  filename: string;
+  source: ImportSourceFormat;
+  total: number;
+  new: number;
+  duplicated: number;
+  errors: number;
+  rows: ImportPreviewRow[];
+};
+
+export type ImportConfirmRow = {
+  staged_id: number;
+  category: string;
+  description: string;
+};
+
+export type ImportConfirmResponse = {
+  status: string;
+  batch_id: number;
+  imported: number;
+  skipped: number;
+};
+
+export type ImportBatchSummary = {
+  id: number;
+  filename: string;
+  source: ImportSourceFormat;
+  status: "processing" | "preview" | "completed" | "failed" | "cancelled";
+  total: number;
+  new_count: number;
+  duplicated_count: number;
+  error_count: number;
+  imported_count: number;
+  created_at: string;
+  completed_at?: string | null;
 };
 
 export type HttpErrorKind =
@@ -430,5 +493,35 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+  },
+
+  // Importação de extrato (CSV/OFX)
+  previewImport: async (file: File): Promise<ImportPreviewResponse> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    // Sem Content-Type manual aqui: o navegador define o boundary do
+    // multipart/form-data sozinho. Timeout maior que o padrão porque
+    // parsing + deduplicação de um extrato grande pode levar mais
+    // que os 10s usados pelas outras chamadas.
+    return await fetchWithTimeout(
+      `${API_URL}/transactions/import/preview`,
+      { method: "POST", body: formData },
+      30000,
+    );
+  },
+
+  confirmImport: async (
+    batchId: number,
+    rows: ImportConfirmRow[],
+  ): Promise<ImportConfirmResponse> => {
+    return await fetchWithTimeout(`${API_URL}/transactions/import/confirm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ batch_id: batchId, rows }),
+    });
+  },
+
+  getImportBatches: async (): Promise<ImportBatchSummary[]> => {
+    return await fetchWithTimeout(`${API_URL}/transactions/import/batches`);
   },
 };

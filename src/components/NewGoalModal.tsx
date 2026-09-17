@@ -44,18 +44,25 @@ export function NewGoalModal({ onSuccess }: NewGoalModalProps) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-4 py-2 rounded-lg text-sm transition-colors"
+        className="flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors w-full sm:w-auto"
       >
         <Target size={18} /> Nova Meta
       </button>
     );
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-2xl p-6">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center sm:items-center sm:p-4">
+      <div
+        className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-t-2xl sm:rounded-2xl p-6 max-h-[90dvh] overflow-y-auto"
+        style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+      >
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold">Definir Nova Meta</h2>
-          <button onClick={() => setIsOpen(false)}>
+          <button
+            onClick={() => setIsOpen(false)}
+            aria-label="Fechar"
+            className="flex h-9 w-9 items-center justify-center -mr-2 text-zinc-500 hover:text-zinc-300"
+          >
             <X size={20} />
           </button>
         </div>
@@ -74,7 +81,7 @@ export function NewGoalModal({ onSuccess }: NewGoalModalProps) {
               placeholder="Valor Alvo"
               value={target}
               onChange={(e) => setTarget(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 transition-all"
+              className="font-figures w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 transition-all"
               required
             />
             <input

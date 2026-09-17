@@ -42,8 +42,9 @@ export default function PlanningPage() {
   return (
     <AppLayout>
       <div className="min-h-screen">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
+      {/* Header — empilha no mobile (senão "Planejamento" + o botão
+          "Nova Meta" espremiam um contra o outro numa tela estreita) */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold">Planejamento</h1>
 
@@ -56,11 +57,11 @@ export default function PlanningPage() {
       </div>
 
       {/* Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
           <p className="text-zinc-500 text-sm">Total Guardado</p>
 
-          <h2 className="text-2xl font-bold mt-2 text-emerald-400">
+          <h2 className="font-figures text-2xl font-bold mt-2 text-emerald-400">
             {new Intl.NumberFormat("pt-BR", {
               style: "currency",
               currency: "BRL",
@@ -71,13 +72,13 @@ export default function PlanningPage() {
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
           <p className="text-zinc-500 text-sm">Metas Ativas</p>
 
-          <h2 className="text-2xl font-bold mt-2">{goals.filter(g => g.percent < 100).length}</h2>
+          <h2 className="font-figures text-2xl font-bold mt-2">{goals.filter(g => g.percent < 100).length}</h2>
         </div>
 
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
           <p className="text-zinc-500 text-sm">Meta Mais Próxima</p>
 
-          <h2 className="text-lg font-bold mt-2 text-emerald-400">
+          <h2 className="text-lg font-bold mt-2 text-emerald-400 truncate">
             {goals.length > 0
               ? goals.sort((a, b) => b.percent - a.percent)[0].goal_name
               : "Nenhuma"}

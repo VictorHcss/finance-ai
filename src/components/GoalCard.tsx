@@ -73,25 +73,29 @@ export function GoalCard({ goal, onUpdate }: GoalCardProps) {
 
         <div className="text-right flex flex-col items-end gap-2">
           <div>
-            <p className={`text-2xl font-bold ${isCompleted ? 'text-emerald-500' : 'text-emerald-400'}`}>
+            <p className={`font-figures text-2xl font-bold ${isCompleted ? 'text-emerald-500' : 'text-emerald-400'}`}>
               {Math.min(goal.percent, 100).toFixed(0)}%
             </p>
             <p className="text-zinc-500 text-xs">concluído</p>
           </div>
           
-          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Sempre visível no toque (abaixo de md); no desktop some até
+              passar o mouse no card, igual antes. */}
+          <div className="flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
             {!isCompleted && (
               <>
                 <button 
                   onClick={() => setIsAddValueOpen(true)}
-                  className="p-1.5 hover:bg-emerald-500/10 hover:text-emerald-500 text-zinc-500 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold"
+                  aria-label="Adicionar valor"
+                  className="p-2 hover:bg-emerald-500/10 hover:text-emerald-500 text-zinc-500 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold"
                   title="Adicionar valor"
                 >
                   <PlusCircle size={18} />
                 </button>
                 <button 
                   onClick={handleComplete}
-                  className="p-1.5 hover:bg-emerald-500/10 hover:text-emerald-500 text-zinc-500 rounded-lg transition-colors"
+                  aria-label="Concluir meta"
+                  className="p-2 hover:bg-emerald-500/10 hover:text-emerald-500 text-zinc-500 rounded-lg transition-colors"
                   title="Concluir meta"
                 >
                   <CheckCircle2 size={18} />
@@ -100,7 +104,8 @@ export function GoalCard({ goal, onUpdate }: GoalCardProps) {
             )}
             <button 
               onClick={handleDelete}
-              className="p-1.5 hover:bg-red-500/10 hover:text-red-500 text-zinc-500 rounded-lg transition-colors"
+              aria-label="Excluir meta"
+              className="p-2 hover:bg-rose-500/10 hover:text-rose-500 text-zinc-500 rounded-lg transition-colors"
               title="Excluir meta"
             >
               <Trash2 size={18} />
@@ -126,7 +131,7 @@ export function GoalCard({ goal, onUpdate }: GoalCardProps) {
         <div className="bg-zinc-800/50 rounded-xl p-4">
           <p className="text-zinc-500 text-xs uppercase font-bold tracking-wider">Guardado</p>
 
-          <p className="text-lg font-bold text-white mt-1">
+          <p className="font-figures text-lg font-bold text-white mt-1">
             {new Intl.NumberFormat("pt-BR", {
               style: "currency",
               currency: "BRL",
@@ -139,7 +144,7 @@ export function GoalCard({ goal, onUpdate }: GoalCardProps) {
             {isCompleted ? "Excedente" : "Falta"}
           </p>
 
-          <p className="text-lg font-bold text-white mt-1">
+          <p className="font-figures text-lg font-bold text-white mt-1">
             {new Intl.NumberFormat("pt-BR", {
               style: "currency",
               currency: "BRL",
@@ -163,7 +168,7 @@ export function GoalCard({ goal, onUpdate }: GoalCardProps) {
         ) : (
           <div className="flex items-center justify-between">
             <p className="text-zinc-300 text-sm">
-              Faltam <span className="text-emerald-400 font-bold">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(goal.missing)}</span>
+              Faltam <span className="font-figures text-emerald-400 font-bold">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(goal.missing)}</span>
             </p>
             <button 
               onClick={() => setIsAddValueOpen(true)}

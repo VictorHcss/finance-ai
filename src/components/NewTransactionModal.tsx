@@ -134,7 +134,8 @@ export function NewTransactionModal() {
     return (
       <button
         onClick={openForNew}
-        className="fixed bottom-8 right-8 flex items-center gap-2 px-4 py-4 md:px-6 md:py-4 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-semibold shadow-[0_10px_20px_rgba(16,185,129,0.2)] ring-1 ring-white/20 hover:shadow-[0_15px_30px_rgba(16,185,129,0.4)] hover:-translate-y-1 active:scale-95 transition-all duration-300 ease-out group z-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-zinc-950"
+        className="fixed right-5 bottom-5 sm:right-8 sm:bottom-8 flex items-center gap-2 px-4 py-4 md:px-6 md:py-4 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-semibold shadow-[0_10px_20px_rgba(27,175,128,0.25)] ring-1 ring-white/20 hover:shadow-[0_15px_30px_rgba(27,175,128,0.4)] hover:-translate-y-1 active:scale-95 transition-all duration-300 ease-out group z-40 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-zinc-950"
+        style={{ marginBottom: "env(safe-area-inset-bottom)", marginRight: "env(safe-area-inset-right)" }}
         aria-label="Nova transação"
         title="Nova transação"
       >
@@ -149,17 +150,23 @@ export function NewTransactionModal() {
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center sm:items-center sm:p-4"
       onMouseDown={(e) => {
         // Fecha ao clicar fora da caixa do modal (no overlay escuro)
         if (e.target === e.currentTarget) closeModal();
       }}
     >
+      {/* No celular vira uma "bottom sheet" (colada na base, sem raio
+          embaixo, rolável) em vez de uma caixa centralizada — fica mais
+          fácil de alcançar com o polegar e evita cortar o formulário
+          quando o teclado abre. A partir de sm: volta a ser um modal
+          centralizado normal. */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="transaction-modal-title"
-        className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-2xl p-6 shadow-2xl"
+        className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl max-h-[90dvh] overflow-y-auto"
+        style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
       >
         <div className="flex justify-between items-center mb-6">
           <h2 id="transaction-modal-title" className="text-xl font-bold">
@@ -169,7 +176,7 @@ export function NewTransactionModal() {
           <button
             onClick={closeModal}
             aria-label="Fechar"
-            className="text-zinc-500 hover:text-zinc-300"
+            className="flex h-9 w-9 items-center justify-center -mr-2 text-zinc-500 hover:text-zinc-300"
           >
             <X size={20} />
           </button>
@@ -212,7 +219,7 @@ export function NewTransactionModal() {
                   placeholder="0,00"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 pl-9 text-sm focus:outline-none focus:border-emerald-500 transition-all"
+                  className="font-figures w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 pl-9 text-sm focus:outline-none focus:border-emerald-500 transition-all"
                   required
                 />
               </div>

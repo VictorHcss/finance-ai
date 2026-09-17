@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from typing import Iterable
 
 from app.core.config import DB_PATH
+from app.core.dedupe import compute_dedupe_hash, normalize_description
 from app.core.security import hash_password
 
 
@@ -221,6 +222,101 @@ def init_db() -> None:
             ],
         )
 
+        # Suporte à importação de extrato (CSV/OFX): toda transação
+        # passa a ter uma origem (manual | import | futuramente
+        # open_finance). `external_id` guarda o identificador dado
+        # pelo banco (ex.: FITID do OFX) e `dedupe_hash` é o fallback
+        # quando não há esse identificador — calculado a partir de
+        # data + descrição normalizada + valor + tipo, ver
+        # app/core/dedupe.py. Nenhuma dessas colunas é exclusiva de
+        # CSV/OFX: o objetivo é que Open Finance, no futuro, use os
+        # mesmos campos.
+        _ensure_columns(
+            cursor,
+            "transactions",
+            [
+                "source TEXT NOT NULL DEFAULT 'manual'",
+                "external_id TEXT",
+                "dedupe_hash TEXT",
+                "import_batch_id INTEGER REFERENCES import_batches(id)",
+                "original_description TEXT",
+            ],
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS import_batches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                source TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'processing',
+                total INTEGER NOT NULL DEFAULT 0,
+                new_count INTEGER NOT NULL DEFAULT 0,
+                duplicated_count INTEGER NOT NULL DEFAULT 0,
+                error_count INTEGER NOT NULL DEFAULT 0,
+                imported_count INTEGER NOT NULL DEFAULT 0,
+                error_message TEXT,
+                created_at TEXT NOT NULL,
+                completed_at TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+            """
+        )
+
+        # Linhas "em prévia" de uma importação: nada aqui vira uma
+        # transação de verdade até a confirmação do usuário (ver
+        # docs da funcionalidade — "não salvar imediatamente após o
+        # upload").
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS import_staged_rows (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                batch_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                date TEXT,
+                original_description TEXT NOT NULL,
+                normalized_description TEXT,
+                amount REAL,
+                type TEXT,
+                category TEXT,
+                category_source TEXT NOT NULL DEFAULT 'none',
+                status TEXT NOT NULL,
+                error_reason TEXT,
+                external_id TEXT,
+                dedupe_hash TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (batch_id) REFERENCES import_batches(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+            """
+        )
+
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_import_batches_user_created_at
+            ON import_batches(user_id, created_at)
+            """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_staged_rows_batch
+            ON import_staged_rows(batch_id, user_id)
+            """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_transactions_user_external_id
+            ON transactions(user_id, external_id)
+            """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_transactions_user_dedupe_hash
+            ON transactions(user_id, dedupe_hash)
+            """
+        )
+
         cursor.execute(
             """
             UPDATE transactions
@@ -238,6 +334,21 @@ def init_db() -> None:
             """,
             (now, now),
         )
+
+        # Backfill do dedupe_hash para transações que existiam antes
+        # desta coluna (inclusive as lançadas manualmente) — sem isso,
+        # uma importação futura não conseguiria detectar que uma
+        # movimentação já existe se ela tiver sido criada à mão.
+        rows_without_hash = cursor.execute(
+            "SELECT id, date, description, amount, type FROM transactions WHERE dedupe_hash IS NULL"
+        ).fetchall()
+        for row in rows_without_hash:
+            normalized = normalize_description(row["description"])
+            row_hash = compute_dedupe_hash(row["date"], normalized, row["amount"], row["type"])
+            cursor.execute(
+                "UPDATE transactions SET dedupe_hash = ? WHERE id = ?",
+                (row_hash, row["id"]),
+            )
 
         cursor.execute(
             """

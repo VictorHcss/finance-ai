@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 
-import { ArrowUpRight, ArrowDownRight, DollarSign } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, DollarSign, Sparkles } from "lucide-react";
+import Link from "next/link";
 
 import { TransactionList } from "@/components/TransactionList";
 import { storage } from "@/lib/storage";
@@ -33,6 +34,11 @@ interface SummaryCardProps {
     value: number | undefined,
     type: "income" | "expense" | "balance",
   ) => string;
+  /** O Saldo Total é o número mais importante da tela — ganha um
+      tratamento visual levemente diferente (borda e fundo com a cor de
+      marca) pra guiar o olho até ele primeiro, em vez dos três cartões
+      competirem com o mesmo peso visual. */
+  highlight?: boolean;
 }
 
 export default function Home() {
@@ -138,7 +144,7 @@ export default function Home() {
         </p>
       </header>
 
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
         <SummaryCard
           title="Saldo Total"
           amount={formatCurrency(summary.total)}
@@ -146,6 +152,7 @@ export default function Home() {
           percentage={summary.balance_trend_percentage}
           type="balance"
           getTrendAnalysis={getTrendAnalysis}
+          highlight
         />
 
         <SummaryCard
@@ -174,13 +181,35 @@ export default function Home() {
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <TransactionList />
 
-        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-6 flex flex-col justify-center">
-          <h3 className="text-emerald-500 font-bold mb-2 flex items-center gap-2">
+        {/* Cor própria (roxo "ai", não o verde do dinheiro): sinaliza que
+            este bloco é uma leitura da IA sobre os dados, não um número
+            bruto da sua conta — a mesma distinção que separa "extrato" de
+            "opinião" num relatório financeiro de verdade. */}
+        <div className="bg-ai-500/[0.07] border border-ai-500/25 rounded-xl p-6 flex flex-col justify-center relative overflow-hidden">
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-ai-500/10 rounded-full blur-3xl" aria-hidden="true" />
+          <h3 className="text-ai-300 font-bold mb-2 flex items-center gap-2 relative">
+            <Sparkles size={16} className="text-ai-400" />
             Insight da IA
           </h3>
 
-          {insight ? (
-            <div className="space-y-3">
+          {insight?.ai_enabled === false ? (
+            // Antes, desligar "Insights Semanais da IA" em Configurações
+            // não mudava nada aqui — o card continuava mostrando os
+            // últimos números calculados, dando a entender que a IA
+            // ainda estava ativa. Agora reflete o estado real.
+            <div className="space-y-2 relative">
+              <p className="text-zinc-300 text-sm leading-relaxed">
+                {insight.alerta}
+              </p>
+              <Link
+                href="/settings"
+                className="inline-block text-xs font-medium text-ai-300 hover:text-ai-200 underline underline-offset-2"
+              >
+                Reativar em Configurações
+              </Link>
+            </div>
+          ) : insight ? (
+            <div className="space-y-3 relative">
               <p className="text-zinc-300 text-sm leading-relaxed">
                 {insight.alerta}
               </p>
@@ -191,7 +220,7 @@ export default function Home() {
                     Previsão
                   </p>
 
-                  <p className="text-emerald-500 font-bold">
+                  <p className="font-figures text-ai-300 font-bold">
                     {formatCurrency(insight.previsao_proximo_mes)}
                   </p>
                 </div>
@@ -201,14 +230,14 @@ export default function Home() {
                     Economia
                   </p>
 
-                  <p className="text-emerald-500 font-bold">
+                  <p className="font-figures text-ai-300 font-bold">
                     {formatCurrency(insight.economias_sugeridas)}
                   </p>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 relative">
               <p className="text-zinc-300 text-sm leading-relaxed">
                 Ainda não há dados suficientes.
               </p>
@@ -232,6 +261,7 @@ function SummaryCard({
   percentage,
   type,
   getTrendAnalysis,
+  highlight,
 }: SummaryCardProps) {
   const hasData = percentage !== undefined && percentage !== null;
 
@@ -261,14 +291,22 @@ function SummaryCard({
   };
 
   return (
-    <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/50 space-y-3 hover:border-zinc-700 transition-colors">
+    <div
+      className={`p-6 rounded-xl border space-y-3 transition-colors ${
+        highlight
+          ? "border-emerald-500/30 bg-gradient-to-br from-emerald-500/[0.08] to-zinc-900/50 hover:border-emerald-500/50"
+          : "border-zinc-800 bg-zinc-900/50 hover:border-zinc-700"
+      }`}
+    >
       <div className="flex justify-between items-center text-zinc-400">
         <span className="text-sm font-medium">{title}</span>
 
-        <div className="p-1.5 bg-zinc-800 rounded-md">{icon}</div>
+        <div className={`p-1.5 rounded-md ${highlight ? "bg-emerald-500/15 text-emerald-400" : "bg-zinc-800"}`}>
+          {icon}
+        </div>
       </div>
 
-      <h2 className="text-3xl font-bold tracking-tight">{amount}</h2>
+      <h2 className="font-figures text-3xl font-bold tracking-tight">{amount}</h2>
 
       <div className={`text-xs font-medium leading-relaxed ${getTrendColor()}`}>
         {analysis}

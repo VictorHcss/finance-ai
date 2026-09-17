@@ -10,6 +10,7 @@ from app.routers.auth import router as auth_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.goals import router as goals_router
 from app.routers.health import router as health_router
+from app.routers.import_transactions import router as import_router
 from app.routers.insights import router as insights_router
 from app.routers.notifications import router as notifications_router
 from app.routers.settings import router as settings_router
@@ -38,6 +39,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(auth_router)
+    app.include_router(import_router)
     app.include_router(transactions_router)
     app.include_router(goals_router)
     app.include_router(dashboard_router)

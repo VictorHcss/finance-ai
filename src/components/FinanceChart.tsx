@@ -64,7 +64,7 @@ export function FinanceChart() {
               dataKey="name"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: "#71717a", fontSize: 12 }}
+              tick={{ fill: "#71717a", fontSize: 12, fontFamily: "var(--font-sans)" }}
             />
 
             <YAxis hide />
@@ -74,8 +74,10 @@ export function FinanceChart() {
                 backgroundColor: "#18181b",
                 border: "1px solid #27272a",
                 borderRadius: "8px",
+                fontFamily: "var(--font-mono)",
+                fontSize: "13px",
               }}
-              itemStyle={{ color: "#10b981" }}
+              itemStyle={{ color: "#1baf80" }}
             />
 
             <Area

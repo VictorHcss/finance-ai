@@ -601,7 +601,22 @@ const localStorageBackend = {
 
   async getInsights(): Promise<InsightData | null> {
     const userId = requireCurrentUserId();
-    return computeInsights(loadTransactions(userId));
+    const settingsByUser = readLs<Record<number, UserSettings>>(LS_KEY_SETTINGS, {});
+    const aiEnabled = settingsByUser[userId]?.ai_enabled ?? true;
+    if (!aiEnabled) {
+      return {
+        ai_enabled: false,
+        alerta: "Os Insights de IA estão desativados nas suas Configurações.",
+        previsao_proximo_mes: 0,
+        economias_sugeridas: 0,
+        media_gastos: 0,
+        variacao_percentual: 0,
+        historico: [],
+        insights: [],
+      };
+    }
+    const result = computeInsights(loadTransactions(userId));
+    return result ? { ...result, ai_enabled: true } : result;
   },
 
   async getChartData(): Promise<ChartDataPoint[]> {

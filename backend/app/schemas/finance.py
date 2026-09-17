@@ -72,6 +72,7 @@ class InsightHistoryPoint(BaseModel):
 
 
 class InsightResponse(BaseModel):
+    ai_enabled: bool = True
     alerta: str
     previsao_proximo_mes: float
     economias_sugeridas: float

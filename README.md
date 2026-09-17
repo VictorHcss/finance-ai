@@ -86,7 +86,7 @@ src/
 
 - Cadastro, login, logout, recuperação de senha (fluxo de e-mail ainda não implementado — ver `docs/IDEIAS.md`)
 - Edição de perfil e troca de senha reais
-- Transações: criar, editar, excluir, listar
+- Transações: criar, editar, excluir, listar, exportar em CSV (respeitando o filtro de busca aplicado)
 - Metas: criar, depositar, concluir, excluir, com percentual de progresso
 - Dashboard com saldo, entradas, saídas e tendência mês a mês de cada um (calculados separadamente — antes um bug fazia o card de Entradas mostrar a variação de Saídas por engano)
 - Insights gerados a partir do histórico real: categoria de gasto dominante, despesas recorrentes detectadas automaticamente, pressão de fluxo de caixa, tendência de receita, projeção de tempo até concluir a próxima meta
@@ -98,3 +98,4 @@ src/
 - [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) — como a autenticação funciona, fluxo de dados, decisões de design
 - [`docs/IDEIAS.md`](docs/IDEIAS.md) — próximas implementações sugeridas, por prioridade
 - [`docs/SEGURANCA.md`](docs/SEGURANCA.md) — o que já foi corrigido, o que ainda precisa de atenção antes de produção
+- [`docs/MELHORIAS.md`](docs/MELHORIAS.md) — mudanças mais recentes (layout mobile, exportar CSV, correção do toggle de IA, Configurações redesenhada) e por que cada uma foi feita

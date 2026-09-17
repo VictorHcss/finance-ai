@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { ArrowUpCircle, ArrowDownCircle, Receipt, Trash2, Pencil } from "lucide-react";
 import { storage } from "@/lib/storage";
 import type { Transaction } from "@/lib/api";
+import { formatCurrency } from "@/lib/utils";
 
 export function TransactionList() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -31,17 +32,22 @@ export function TransactionList() {
     return () => window.removeEventListener("transactions-changed", loadTransactions);
   }, [loadTransactions]);
 
-  async function handleDelete(id: number | undefined, description: string) {
-    if (!id) return;
+  async function handleDelete(transaction: Transaction) {
+    if (!transaction.id) return;
 
+    // Mostrar o valor formatado, e não só a descrição, reduz o risco
+    // de excluir a transação errada quando duas têm nomes parecidos
+    // (ex: duas entradas de "Salário" em meses diferentes) — ver
+    // docs/IDEIAS.md.
+    const signal = transaction.type === "expense" ? "-" : "+";
     const confirmed = window.confirm(
-      `Excluir a transação "${description}"? Essa ação não pode ser desfeita.`
+      `Excluir a transação "${transaction.description}" (${signal} ${formatCurrency(transaction.amount)})?\n\nEssa ação não pode ser desfeita.`
     );
     if (!confirmed) return;
 
-    setDeletingId(id);
+    setDeletingId(transaction.id);
     try {
-      await storage.deleteTransaction(id);
+      await storage.deleteTransaction(transaction.id);
       window.dispatchEvent(new Event("transactions-changed"));
     } catch (err) {
       console.error("Erro ao excluir transação:", err);
@@ -95,7 +101,7 @@ export function TransactionList() {
 
               <div className="flex items-center gap-3 shrink-0">
                 <p
-                  className={`text-sm font-bold ${
+                  className={`font-figures text-sm font-bold ${
                     t.type === "income" ? "text-emerald-500" : "text-zinc-100"
                   }`}
                 >
@@ -106,19 +112,24 @@ export function TransactionList() {
                   }).format(t.amount)}
                 </p>
 
+                {/* No touch (abaixo de md) os ícones ficam sempre visíveis —
+                    "aparece só no hover" não existe em quem usa o dedo, o
+                    botão simplesmente nunca aparecia nesses aparelhos. Do
+                    md pra cima, mantém o hover-to-reveal (mais limpo no
+                    desktop, onde o mouse dá esse sinal). */}
                 <button
                   onClick={() => window.dispatchEvent(new CustomEvent("open-transaction-modal", { detail: t }))}
                   aria-label={`Editar transação ${t.description}`}
-                  className="text-zinc-600 hover:text-emerald-500 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800 hover:text-emerald-500 transition-colors md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
                 >
                   <Pencil size={16} />
                 </button>
 
                 <button
-                  onClick={() => handleDelete(t.id, t.description)}
+                  onClick={() => handleDelete(t)}
                   disabled={deletingId === t.id}
                   aria-label={`Excluir transação ${t.description}`}
-                  className="text-zinc-600 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-50"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-rose-500/10 hover:text-rose-500 transition-colors md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 disabled:opacity-50"
                 >
                   <Trash2 size={16} />
                 </button>

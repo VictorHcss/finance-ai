@@ -3,18 +3,22 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from app.core.database import get_connection
+from app.core.dedupe import compute_dedupe_hash, normalize_description
 
 
 class FinanceRepository:
     def create_transaction(self, user_id: int, payload: dict) -> None:
         now = datetime.now(timezone.utc).isoformat()
+        normalized = normalize_description(payload["description"])
+        dedupe_hash = compute_dedupe_hash(payload["date"], normalized, payload["amount"], payload["type"])
         with get_connection() as conn:
             conn.execute(
                 """
                 INSERT INTO transactions (
-                    user_id, description, amount, type, category, date, created_at, updated_at
+                    user_id, description, amount, type, category, date,
+                    source, dedupe_hash, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?)
                 """,
                 (
                     user_id,
@@ -23,6 +27,7 @@ class FinanceRepository:
                     payload["type"],
                     payload["category"],
                     payload["date"],
+                    dedupe_hash,
                     now,
                     now,
                 ),
@@ -33,7 +38,7 @@ class FinanceRepository:
         with get_connection() as conn:
             rows = conn.execute(
                 """
-                SELECT id, description, amount, type, category, date
+                SELECT id, description, amount, type, category, date, source
                 FROM transactions
                 WHERE user_id = ?
                 ORDER BY date DESC, id DESC
@@ -41,6 +46,60 @@ class FinanceRepository:
                 (user_id,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def bulk_create_imported_transactions(self, user_id: int, rows: List[dict], import_batch_id: int) -> int:
+        """Persiste, de uma só vez, as linhas de uma prévia de
+        importação já confirmadas pelo usuário. `executemany` evita
+        uma query por transação em extratos grandes."""
+        now = datetime.now(timezone.utc).isoformat()
+        values = [
+            (
+                user_id,
+                row["description"],
+                row["amount"],
+                row["type"],
+                row["category"],
+                row["date"],
+                "import",
+                row.get("external_id"),
+                row["dedupe_hash"],
+                import_batch_id,
+                row.get("original_description", row["description"]),
+                now,
+                now,
+            )
+            for row in rows
+        ]
+        with get_connection() as conn:
+            conn.executemany(
+                """
+                INSERT INTO transactions (
+                    user_id, description, amount, type, category, date,
+                    source, external_id, dedupe_hash, import_batch_id,
+                    original_description, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                values,
+            )
+            conn.commit()
+        return len(values)
+
+    def get_existing_external_ids(self, user_id: int) -> set:
+        with get_connection() as conn:
+            rows = conn.execute(
+                "SELECT external_id FROM transactions WHERE user_id = ? AND external_id IS NOT NULL",
+                (user_id,),
+            ).fetchall()
+        return {row["external_id"] for row in rows}
+
+    def get_existing_dedupe_hashes(self, user_id: int) -> set:
+        with get_connection() as conn:
+            rows = conn.execute(
+                "SELECT dedupe_hash FROM transactions WHERE user_id = ? AND dedupe_hash IS NOT NULL",
+                (user_id,),
+            ).fetchall()
+        return {row["dedupe_hash"] for row in rows}
 
     def update_transaction(self, user_id: int, transaction_id: int, payload: dict) -> int:
         now = datetime.now(timezone.utc).isoformat()

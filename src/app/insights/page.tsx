@@ -11,6 +11,7 @@ import {
   TrendingDown,
   Info,
 } from "lucide-react";
+import Link from "next/link";
 import { storage } from "@/lib/storage";
 import type { InsightData, InsightEntry } from "@/lib/api";
 import {
@@ -74,6 +75,34 @@ export default function InsightsPage() {
           Tentar novamente
         </button>
       </main>
+      </AppLayout>
+    );
+  }
+
+  // Antes, desligar "Insights Semanais da IA" em Configurações não
+  // mudava nada nesta tela: o backend continuava tentando gerar as
+  // mesmas análises e o usuário via os cards normalmente, sem
+  // nenhuma indicação de que o toggle existia. Agora a página inteira
+  // reflete o estado desligado, em vez de só o card do Dashboard.
+  if (!loading && data?.ai_enabled === false) {
+    return (
+      <AppLayout>
+        <main className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 text-center px-4">
+          <div className="p-3 bg-zinc-800/60 rounded-xl">
+            <BrainCircuit size={40} className="text-zinc-500" />
+          </div>
+          <h2 className="text-xl font-bold">Insights de IA desativados</h2>
+          <p className="text-zinc-500 max-w-sm">
+            Você desligou os insights automáticos nas suas Configurações. Reative
+            para voltar a receber análises sobre seus hábitos financeiros.
+          </p>
+          <Link
+            href="/settings"
+            className="bg-emerald-600 hover:bg-emerald-500 px-6 py-2 rounded-lg transition-colors text-sm font-medium"
+          >
+            Ir para Configurações
+          </Link>
+        </main>
       </AppLayout>
     );
   }

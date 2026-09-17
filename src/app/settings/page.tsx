@@ -1,13 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { User, Bell, Database } from "lucide-react";
+import { User, Sparkles, Database, ShieldAlert, Globe2 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { storage } from "@/lib/storage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { useHandleFetchError } from "@/hooks/useHandleFetchError";
 import type { UserSettings } from "@/lib/api";
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
 
 export default function SettingsPage() {
   const { user, logout, refreshUser } = useAuth();
@@ -106,23 +116,51 @@ export default function SettingsPage() {
     }
   }
 
+  const displayName = user?.name ?? "Usuário";
+  const initials = getInitials(displayName);
+  const memberSince = user?.created_at
+    ? new Date(user.created_at).toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
+
   return (
     <AppLayout>
       <main className="space-y-8">
         <header>
           <h1 className="text-2xl font-bold">Configurações</h1>
           <p className="text-zinc-400 text-sm">
-            Gerencie suas preferências e dados da conta.
+            Gerencie seu perfil, preferências e dados da conta.
           </p>
         </header>
 
         <div className="max-w-4xl space-y-6">
           {/* Seção: Perfil */}
-          <section className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/50 space-y-4">
-            <div className="flex items-center gap-2 text-emerald-500 mb-2">
+          <section className="p-5 sm:p-6 rounded-2xl border border-zinc-800 bg-zinc-900/50 space-y-5">
+            <div className="flex items-center gap-2 text-emerald-500">
               <User size={20} />
               <h3 className="font-bold">Perfil do Usuário</h3>
             </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 pb-1">
+              <div className="w-16 h-16 shrink-0 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-xl font-bold text-white shadow-sm shadow-emerald-500/20 ring-1 ring-white/10">
+                {initials}
+              </div>
+              <div className="min-w-0">
+                <p className="text-base font-semibold text-zinc-100 truncate">
+                  {displayName}
+                </p>
+                <p className="text-sm text-zinc-500 truncate">{user?.email}</p>
+                {memberSince && (
+                  <p className="text-xs text-zinc-600 mt-0.5">
+                    Membro desde {memberSince}
+                  </p>
+                )}
+              </div>
+            </div>
+
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -135,7 +173,7 @@ export default function SettingsPage() {
                     onChange={(e) => setName(e.target.value)}
                     required
                     minLength={2}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-sm focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-sm focus:outline-none focus:border-emerald-500"
                   />
                 </div>
                 <div>
@@ -147,27 +185,27 @@ export default function SettingsPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-sm focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-sm focus:outline-none focus:border-emerald-500"
                   />
                 </div>
               </div>
               <button
                 type="submit"
                 disabled={savingProfile}
-                className="text-sm bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 px-4 py-2 rounded-lg transition-colors font-medium"
+                className="w-full sm:w-auto text-sm bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 px-4 py-2.5 rounded-lg transition-colors font-medium"
               >
                 {savingProfile ? "Salvando..." : "Salvar alterações"}
               </button>
             </form>
           </section>
 
-          {/* Seção: IA e Notificações */}
-          <section className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/50 space-y-4">
-            <div className="flex items-center gap-2 text-blue-400 mb-2">
-              <Bell size={20} />
+          {/* Seção: Notificações e IA */}
+          <section className="p-5 sm:p-6 rounded-2xl border border-zinc-800 bg-zinc-900/50 space-y-4">
+            <div className="flex items-center gap-2 text-ai-400">
+              <Sparkles size={20} />
               <h3 className="font-bold">Notificações e IA</h3>
             </div>
-            <div className="space-y-3">
+            <div className="divide-y divide-zinc-800/70">
               <ToggleItem
                 title="Alertas de Gastos Críticos"
                 description="Receber aviso quando ultrapassar 80% do orçamento."
@@ -176,8 +214,8 @@ export default function SettingsPage() {
                 onToggle={() => handleToggle("notifications_enabled")}
               />
               <ToggleItem
-                title="Insights Semanais da IA"
-                description="Permitir que a IA analise seus hábitos para sugerir economias."
+                title="Insights de IA"
+                description="Permite que o Dashboard e a tela de Insights analisem seu histórico para gerar previsões e sugestões. Desligado, as duas telas param de gerar novas análises."
                 checked={settings?.ai_enabled ?? true}
                 disabled={!settings || savingSettings}
                 onToggle={() => handleToggle("ai_enabled")}
@@ -185,27 +223,75 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          {/* Seção: Dados */}
-          <section className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/50 space-y-4">
-            <div className="flex items-center gap-2 text-rose-500 mb-2">
-              <Database size={20} />
-              <h3 className="font-bold">Gerenciar Dados</h3>
+          {/* Seção: Preferências regionais — hoje só informativo. O
+              backend já guarda currency/locale por usuário, mas nada no
+              sistema formata valores de acordo com eles ainda (ver
+              docs/IDEIAS.md, "Multi-moeda"): todo valor é exibido em
+              BRL/pt-BR fixo. Mostrar como somente-leitura evita prometer
+              uma opção que ainda não tem efeito real. */}
+          <section className="p-5 sm:p-6 rounded-2xl border border-zinc-800 bg-zinc-900/50 space-y-4">
+            <div className="flex items-center gap-2 text-blue-400">
+              <Globe2 size={20} />
+              <h3 className="font-bold">Preferências Regionais</h3>
             </div>
-            <div className="flex flex-wrap gap-4">
-              <button
-                onClick={handleClearHistory}
-                disabled={clearing}
-                className="text-sm bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 px-4 py-2 rounded-lg transition-colors"
-              >
-                {clearing ? "Limpando..." : "Limpar Histórico"}
-              </button>
-              <button
-                onClick={handleDeleteAccount}
-                disabled={deleting}
-                className="text-sm text-rose-500 border border-rose-500/20 hover:bg-rose-500/10 disabled:opacity-50 px-4 py-2 rounded-lg transition-colors"
-              >
-                {deleting ? "Excluindo..." : "Excluir Conta"}
-              </button>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-zinc-950 border border-zinc-800 p-3">
+                <p className="text-[11px] text-zinc-500 uppercase font-bold">Moeda</p>
+                <p className="text-sm text-zinc-300 mt-0.5">Real (R$)</p>
+              </div>
+              <div className="rounded-lg bg-zinc-950 border border-zinc-800 p-3">
+                <p className="text-[11px] text-zinc-500 uppercase font-bold">Idioma</p>
+                <p className="text-sm text-zinc-300 mt-0.5">Português (Brasil)</p>
+              </div>
+            </div>
+            <p className="text-xs text-zinc-600">
+              Suporte a múltiplas moedas e idiomas está no radar — por enquanto, todo valor é exibido em BRL.
+            </p>
+          </section>
+
+          {/* Seção: Dados — separada visualmente das demais (fundo com
+              tom de risco) porque as duas ações aqui são destrutivas e
+              irreversíveis; misturar com o resto convidava a um clique
+              apressado. */}
+          <section className="p-5 sm:p-6 rounded-2xl border border-rose-500/20 bg-rose-500/[0.04] space-y-4">
+            <div className="flex items-center gap-2 text-rose-500">
+              <ShieldAlert size={20} />
+              <h3 className="font-bold">Zona de Risco</h3>
+            </div>
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-800">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Database size={18} className="text-zinc-500 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-zinc-200">Limpar histórico</p>
+                    <p className="text-xs text-zinc-500">Apaga todas as transações, sem excluir a conta.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleClearHistory}
+                  disabled={clearing}
+                  className="w-full sm:w-auto shrink-0 text-sm bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 px-4 py-2 rounded-lg transition-colors"
+                >
+                  {clearing ? "Limpando..." : "Limpar Histórico"}
+                </button>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-xl bg-zinc-950/60 border border-rose-500/20">
+                <div className="flex items-center gap-3 min-w-0">
+                  <ShieldAlert size={18} className="text-rose-500/80 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-zinc-200">Excluir conta</p>
+                    <p className="text-xs text-zinc-500">Remove permanentemente conta, transações, metas e notificações.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleting}
+                  className="w-full sm:w-auto shrink-0 text-sm text-rose-500 border border-rose-500/30 hover:bg-rose-500/10 disabled:opacity-50 px-4 py-2 rounded-lg transition-colors"
+                >
+                  {deleting ? "Excluindo..." : "Excluir Conta"}
+                </button>
+              </div>
             </div>
           </section>
         </div>
@@ -228,10 +314,10 @@ function ToggleItem({
   onToggle: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between py-2 gap-4">
-      <div>
+    <div className="flex items-center justify-between py-3.5 gap-4 first:pt-0 last:pb-0">
+      <div className="min-w-0">
         <p className="text-sm font-medium text-zinc-200">{title}</p>
-        <p className="text-xs text-zinc-500">{description}</p>
+        <p className="text-xs text-zinc-500 leading-relaxed mt-0.5">{description}</p>
       </div>
       <button
         type="button"
@@ -240,11 +326,11 @@ function ToggleItem({
         aria-label={title}
         disabled={disabled}
         onClick={onToggle}
-        className={`w-10 h-5 rounded-full flex items-center px-1 transition-colors shrink-0 disabled:opacity-50 ${
+        className={`relative shrink-0 w-12 h-7 rounded-full flex items-center px-1 transition-colors disabled:opacity-50 ${
           checked ? "bg-emerald-600 justify-end" : "bg-zinc-700 justify-start"
         }`}
       >
-        <div className="w-3 h-3 bg-white rounded-full" />
+        <div className="w-5 h-5 bg-white rounded-full shadow-sm transition-transform" />
       </button>
     </div>
   );
