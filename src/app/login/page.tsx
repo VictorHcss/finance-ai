@@ -163,20 +163,6 @@ export default function LoginPage() {
             </p>
           </div>
         </div>
-
-        <div className="mt-7 sm:mt-8 text-center">
-          <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-zinc-900/40 border border-zinc-800/60">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-            <p className="text-zinc-500 text-xs sm:text-sm">
-              Demo:{" "}
-              <span className="text-zinc-400 font-mono">
-                demo@finance.ai
-              </span>{" "}
-              /{" "}
-              <span className="text-zinc-400 font-mono">demo123456</span>
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   );

@@ -173,11 +173,11 @@ export default function LandingPage() {
       {/* Header */}
       <header className="border-b border-zinc-800/60 sticky top-0 z-30 bg-zinc-950/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-              <span className="text-black font-bold text-sm">$</span>
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
+              <span className="text-black font-bold text-xs sm:text-sm">$</span>
             </div>
-            <span className="font-bold tracking-tight text-emerald-500">
+            <span className="font-bold tracking-tight text-emerald-500 text-sm sm:text-base whitespace-nowrap">
               FINANCE.AI
             </span>
           </div>
@@ -192,18 +192,19 @@ export default function LandingPage() {
               Dúvidas
             </a>
           </nav>
-          <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             <Link
               href="/login"
-              className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors"
+              className="text-xs sm:text-sm text-zinc-400 hover:text-zinc-100 transition-colors whitespace-nowrap"
             >
               Entrar
             </Link>
             <Link
               href="/register"
-              className="text-sm bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors"
+              className="text-xs sm:text-sm bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg transition-colors whitespace-nowrap"
             >
-              Criar conta grátis
+              <span className="sm:hidden">Criar conta</span>
+              <span className="hidden sm:inline">Criar conta grátis</span>
             </Link>
           </div>
         </div>

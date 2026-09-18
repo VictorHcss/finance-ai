@@ -55,10 +55,10 @@ export function Sidebar() {
       <button
         onClick={() => setIsOpen(true)}
         aria-label="Abrir menu"
-        className="fixed left-4 z-50 flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900 text-zinc-300 shadow-lg active:scale-95 transition-transform lg:hidden"
+        className="fixed left-4 z-50 grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-zinc-800 bg-zinc-900 p-0 leading-none text-zinc-300 shadow-lg active:scale-95 transition-transform lg:hidden"
         style={{ top: "calc(1rem + env(safe-area-inset-top))" }}
       >
-        <Menu size={20} />
+        <Menu size={20} className="block" />
       </button>
 
       {/* Fundo escurecido atrás do menu aberto no mobile */}
