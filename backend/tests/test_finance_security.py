@@ -125,6 +125,78 @@ def test_usuario_nao_exclui_meta_de_outro(client, user_a_headers, user_b_headers
     assert len(client.get("/api/goals/status", headers=user_a_headers).json()) == 1
 
 
+def test_usuario_nao_edita_meta_de_outro(client, user_a_headers, user_b_headers):
+    create_goal(client, user_a_headers, name="Meta de A")
+    goal_id = client.get("/api/goals/status", headers=user_a_headers).json()[0]["id"]
+
+    resp = client.put(
+        f"/api/goals/{goal_id}",
+        headers=user_b_headers,
+        json={"name": "Sequestrada por B", "target_amount": 1.0, "deadline": None},
+    )
+    assert resp.status_code == 404
+
+    goal = client.get("/api/goals/status", headers=user_a_headers).json()[0]
+    assert goal["goal_name"] == "Meta de A"
+    assert goal["target"] == 1000.0
+
+
+def test_editar_meta_inexistente_retorna_404(client, user_a_headers):
+    resp = client.put(
+        "/api/goals/999999",
+        headers=user_a_headers,
+        json={"name": "Não existe", "target_amount": 100.0, "deadline": None},
+    )
+    assert resp.status_code == 404
+
+
+def test_editar_meta_atualiza_nome_alvo_e_prazo_sem_alterar_valor_guardado(client, user_a_headers):
+    create_goal(client, user_a_headers, name="Nome antigo", target_amount=1000.0, current_amount=300.0)
+    goal_id = client.get("/api/goals/status", headers=user_a_headers).json()[0]["id"]
+
+    resp = client.put(
+        f"/api/goals/{goal_id}",
+        headers=user_a_headers,
+        json={"name": "Nome novo", "target_amount": 500.0, "deadline": "2027-01-01"},
+    )
+    assert resp.status_code == 200
+
+    goal = client.get("/api/goals/status", headers=user_a_headers).json()[0]
+    assert goal["goal_name"] == "Nome novo"
+    assert goal["target"] == 500.0
+    assert goal["deadline"] == "2027-01-01"
+    # current_amount não muda por edição — só por depósito/conclusão.
+    assert goal["current"] == 300.0
+
+
+def test_editar_meta_com_alvo_abaixo_do_valor_guardado_marca_como_concluida(client, user_a_headers):
+    create_goal(client, user_a_headers, target_amount=1000.0, current_amount=800.0)
+    goal_id = client.get("/api/goals/status", headers=user_a_headers).json()[0]["id"]
+
+    resp = client.put(
+        f"/api/goals/{goal_id}",
+        headers=user_a_headers,
+        json={"name": "Meta de teste", "target_amount": 500.0, "deadline": None},
+    )
+    assert resp.status_code == 200
+
+    goal = client.get("/api/goals/status", headers=user_a_headers).json()[0]
+    assert goal["completed"] is True
+    assert goal["missing"] == 0
+
+
+def test_editar_meta_com_nome_curto_e_rejeitado(client, user_a_headers):
+    create_goal(client, user_a_headers)
+    goal_id = client.get("/api/goals/status", headers=user_a_headers).json()[0]["id"]
+
+    resp = client.put(
+        f"/api/goals/{goal_id}",
+        headers=user_a_headers,
+        json={"name": "A", "target_amount": 100.0, "deadline": None},
+    )
+    assert resp.status_code == 422
+
+
 def test_deposito_negativo_e_rejeitado(client, user_a_headers):
     create_goal(client, user_a_headers)
     goal_id = client.get("/api/goals/status", headers=user_a_headers).json()[0]["id"]

@@ -188,11 +188,14 @@ export default function LandingPage() {
             <a href="#como-funciona" className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors">
               Como funciona
             </a>
+            <Link href="/precos" className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors">
+              Preços
+            </Link>
             <a href="#faq" className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors">
               Dúvidas
             </a>
           </nav>
-          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+          <div className="flex items-center gap-4 sm:gap-6 shrink-0">
             <Link
               href="/login"
               className="text-xs sm:text-sm text-zinc-400 hover:text-zinc-100 transition-colors whitespace-nowrap"
@@ -203,8 +206,7 @@ export default function LandingPage() {
               href="/register"
               className="text-xs sm:text-sm bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg transition-colors whitespace-nowrap"
             >
-              <span className="sm:hidden">Criar conta</span>
-              <span className="hidden sm:inline">Criar conta grátis</span>
+              Criar conta
             </Link>
           </div>
         </div>
@@ -385,6 +387,54 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Segurança e privacidade */}
+      <section id="seguranca" className="max-w-5xl mx-auto px-4 sm:px-6 pb-20 sm:pb-28 scroll-mt-16">
+        <div className="text-center mb-12">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Segurança e privacidade</h2>
+          <p className="text-zinc-400 mt-3 max-w-lg mx-auto">
+            Sem promessas genéricas — só o que realmente está em produção hoje.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="text-center px-2">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-500/10 mb-4">
+              <Lock size={20} className="text-emerald-500" />
+            </div>
+            <h3 className="font-semibold mb-1.5">Senhas nunca em texto puro</h3>
+            <p className="text-sm text-zinc-400 leading-relaxed">
+              Hash com salt individual por usuário e milhares de iterações — mesmo com acesso ao
+              banco, ninguém recupera sua senha original.
+            </p>
+          </div>
+          <div className="text-center px-2">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-500/10 mb-4">
+              <ShieldCheck size={20} className="text-emerald-500" />
+            </div>
+            <h3 className="font-semibold mb-1.5">Sessão obrigatória em toda requisição</h3>
+            <p className="text-sm text-zinc-400 leading-relaxed">
+              Nenhuma tela ou rota acessa dados sem uma sessão válida — sem exceção, sem usuário
+              padrão de fallback.
+            </p>
+          </div>
+          <div className="text-center px-2">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-500/10 mb-4">
+              <UserPlus size={20} className="text-emerald-500" />
+            </div>
+            <h3 className="font-semibold mb-1.5">Isolamento real entre contas</h3>
+            <p className="text-sm text-zinc-400 leading-relaxed">
+              Cada usuário só enxerga os próprios dados, validado no backend a cada requisição —
+              não é só uma tela de login separada.
+            </p>
+          </div>
+        </div>
+        <p className="text-xs text-zinc-500 text-center max-w-xl mx-auto mt-10">
+          O Finance.AI é um projeto em evolução contínua, sem certificações de segurança formais.
+          Não usamos termos como &quot;criptografia de nível bancário&quot; ou &quot;100% seguro&quot;
+          porque nenhum sistema pode garantir isso — preferimos ser específicos sobre o que existe
+          de verdade.
+        </p>
+      </section>
+
       {/* FAQ */}
       <section id="faq" className="max-w-3xl mx-auto px-4 sm:px-6 pb-20 sm:pb-28 scroll-mt-16">
         <div className="text-center mb-10">
@@ -447,6 +497,9 @@ export default function LandingPage() {
             <a href="#funcionalidades" className="hover:text-zinc-300 transition-colors">
               Funcionalidades
             </a>
+            <Link href="/precos" className="hover:text-zinc-300 transition-colors">
+              Preços
+            </Link>
             <Link href="/login" className="hover:text-zinc-300 transition-colors">
               Entrar
             </Link>

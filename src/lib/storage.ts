@@ -9,6 +9,7 @@ import {
   type ChartDataPoint,
   type DashboardSummary,
   type Goal,
+  type GoalContribution,
   type ImportBatchSummary,
   type ImportConfirmResponse,
   type ImportConfirmRow,
@@ -299,10 +300,37 @@ export const storage = {
       () => localStorageApi.createGoal(data),
     ),
 
+  updateGoal: async (
+    id: number,
+    data: { name: string; target_amount: number; deadline: string | null },
+  ) =>
+    resolveWrite(
+      () => api.updateGoal(id, data),
+      () => localStorageApi.updateGoal(id, data),
+    ),
+
   depositGoal: async (id: number, amount: number) =>
     resolveWrite(
       () => api.depositGoal(id, amount),
       () => localStorageApi.depositGoal(id, amount),
+    ),
+
+  withdrawGoal: async (id: number, amount: number) =>
+    resolveWrite(
+      () => api.withdrawGoal(id, amount),
+      () => localStorageApi.withdrawGoal(id, amount),
+    ),
+
+  getGoalContributions: async (id: number): Promise<GoalContribution[]> =>
+    fallbackRead(
+      () => api.getGoalContributions(id),
+      () => localStorageApi.getGoalContributions(id),
+    ),
+
+  deleteGoalContribution: async (goalId: number, contributionId: number) =>
+    resolveWrite(
+      () => api.deleteGoalContribution(goalId, contributionId),
+      () => localStorageApi.deleteGoalContribution(goalId, contributionId),
     ),
 
   completeGoal: async (id: number) =>

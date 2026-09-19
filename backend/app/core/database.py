@@ -132,6 +132,35 @@ def init_db() -> None:
             """
         )
 
+        # O "cofrinho" da meta: cada linha é uma contribuição (depósito
+        # ou retirada) que compõe o saldo da meta — o saldo (current_amount
+        # em `goals`) deixa de ser um número editável direto e passa a ser
+        # sempre recalculado a partir da soma destas linhas (ver
+        # `FinanceRepository.recompute_goal_balance`). `transaction_id` é
+        # opcional: só é preenchido quando a contribuição nasceu de uma
+        # transação de receita (parte do valor foi destinada à meta na
+        # hora do cadastro) — o `ON DELETE CASCADE` garante que excluir
+        # essa transação sempre remove a contribuição junto, em vez de
+        # deixar dinheiro "fantasma" contado na meta.
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS goal_contributions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                goal_id INTEGER NOT NULL,
+                transaction_id INTEGER,
+                type TEXT NOT NULL DEFAULT 'deposit',
+                amount REAL NOT NULL,
+                source TEXT NOT NULL DEFAULT 'Contribuição manual',
+                date TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE,
+                FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
+            )
+            """
+        )
+
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS notifications (
@@ -335,6 +364,7 @@ def init_db() -> None:
             (now, now),
         )
 
+
         # Backfill do dedupe_hash para transações que existiam antes
         # desta coluna (inclusive as lançadas manualmente) — sem isso,
         # uma importação futura não conseguiria detectar que uma
@@ -366,6 +396,18 @@ def init_db() -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_goals_user_completed
             ON goals(user_id, completed)
+            """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_goal_contributions_user_goal
+            ON goal_contributions(user_id, goal_id)
+            """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_goal_contributions_transaction
+            ON goal_contributions(transaction_id)
             """
         )
         cursor.execute(
@@ -525,5 +567,45 @@ def init_db() -> None:
                     """,
                     (category, priority, title, description, now, now),
                 )
+
+        # Backfill do "cofrinho": metas que já existiam antes da tabela
+        # `goal_contributions` (ex.: as metas de exemplo da conta demo,
+        # recém-criadas acima nesta mesma função na primeira execução,
+        # ou qualquer meta de uma conta real feita antes desta versão)
+        # têm um `current_amount` sem nenhuma contribuição por trás. Sem
+        # isso, a primeira vez que qualquer contribuição nova fosse
+        # registrada e o saldo recalculado a partir da soma das
+        # contribuições, esse valor antigo "sumiria" — o saldo cairia
+        # pra só a contribuição nova, perdendo o que já existia. Uma
+        # única linha "Saldo inicial" por meta preserva o valor sem
+        # inventar um histórico de contribuições que nunca existiu de
+        # verdade. Precisa rodar depois da criação das metas demo acima
+        # (não antes), senão elas ainda não existiriam pra este SELECT.
+        goals_needing_backfill = cursor.execute(
+            """
+            SELECT g.id, g.user_id, g.current_amount, g.created_at
+            FROM goals g
+            WHERE g.current_amount > 0
+              AND NOT EXISTS (
+                  SELECT 1 FROM goal_contributions gc WHERE gc.goal_id = g.id
+              )
+            """
+        ).fetchall()
+        for goal_row in goals_needing_backfill:
+            cursor.execute(
+                """
+                INSERT INTO goal_contributions (
+                    user_id, goal_id, transaction_id, type, amount, source, date, created_at
+                )
+                VALUES (?, ?, NULL, 'deposit', ?, 'Saldo inicial', ?, ?)
+                """,
+                (
+                    goal_row["user_id"],
+                    goal_row["id"],
+                    goal_row["current_amount"],
+                    goal_row["created_at"] or now,
+                    now,
+                ),
+            )
 
         conn.commit()

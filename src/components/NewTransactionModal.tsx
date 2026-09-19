@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, Plus } from "lucide-react";
+import { X, Plus, PiggyBank } from "lucide-react";
 import { storage } from "@/lib/storage";
-import type { Transaction } from "@/lib/api";
+import type { Goal, Transaction } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/contexts/ToastContext";
 import { useHandleFetchError } from "@/hooks/useHandleFetchError";
@@ -27,6 +27,14 @@ export function NewTransactionModal() {
   const [date, setDate] = useState(todayDateInputValue());
   const [loading, setLoading] = useState(false);
 
+  // "Guardar parte dessa receita numa meta" (só faz sentido em
+  // receitas novas — editar uma transação já existente não mexe na
+  // alocação, ver storage.updateTransaction).
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [allocateToGoal, setAllocateToGoal] = useState(false);
+  const [allocationGoalId, setAllocationGoalId] = useState<number | "">("");
+  const [allocationAmount, setAllocationAmount] = useState("");
+
   const descriptionInputRef = useRef<HTMLInputElement>(null);
 
   // Qualquer lista (Dashboard, Extrato) pode disparar este evento com
@@ -48,6 +56,19 @@ export function NewTransactionModal() {
     return () => window.removeEventListener("open-transaction-modal", handleOpenForEdit);
   }, []);
 
+  // Mesma ideia do evento acima, mas para abrir já em modo de criação
+  // (sem transação nenhuma no detail) — usado pelo estado vazio do
+  // FinanceChart, que não tem acesso direto a este componente.
+  useEffect(() => {
+    function handleOpenForNew() {
+      openForNew();
+    }
+
+    window.addEventListener("open-transaction-modal-new", handleOpenForNew);
+    return () => window.removeEventListener("open-transaction-modal-new", handleOpenForNew);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Fecha com Esc, e foca o primeiro campo assim que o modal abre —
   // sem isso, quem usa teclado/leitor de tela cai direto no formulário
   // sem saber onde o foco está.
@@ -65,7 +86,25 @@ export function NewTransactionModal() {
       clearTimeout(timer);
       document.removeEventListener("keydown", handleKeyDown);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+
+  // Carrega as metas quando o modal abre — usado só pra popular o
+  // seletor de "guardar parte pra uma meta" (não faz sentido buscar
+  // isso enquanto o modal está fechado).
+  useEffect(() => {
+    if (!isOpen) return;
+    storage
+      .getGoalsStatus()
+      .then(setGoals)
+      .catch(() => setGoals([]));
+  }, [isOpen]);
+
+  function resetAllocation() {
+    setAllocateToGoal(false);
+    setAllocationGoalId("");
+    setAllocationAmount("");
+  }
 
   function openForNew() {
     setEditingId(null);
@@ -74,12 +113,14 @@ export function NewTransactionModal() {
     setCategory("");
     setType("income");
     setDate(todayDateInputValue());
+    resetAllocation();
     setIsOpen(true);
   }
 
   function closeModal() {
     setIsOpen(false);
     setEditingId(null);
+    resetAllocation();
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -89,6 +130,24 @@ export function NewTransactionModal() {
     if (!parsedAmount || parsedAmount <= 0) {
       addToast("error", "Informe um valor maior que zero.");
       return;
+    }
+
+    let goalContribution: { goal_id: number; amount: number } | undefined;
+    if (!editingId && type === "income" && allocateToGoal) {
+      const parsedAllocation = parseFloat(allocationAmount);
+      if (!allocationGoalId) {
+        addToast("error", "Escolha uma meta para guardar o valor.");
+        return;
+      }
+      if (!parsedAllocation || parsedAllocation <= 0) {
+        addToast("error", "Informe quanto quer guardar na meta.");
+        return;
+      }
+      if (parsedAllocation > parsedAmount) {
+        addToast("error", "O valor guardado não pode ser maior que o valor da receita.");
+        return;
+      }
+      goalContribution = { goal_id: allocationGoalId, amount: parsedAllocation };
     }
 
     setLoading(true);
@@ -102,6 +161,7 @@ export function NewTransactionModal() {
       // consistentes, sem depender de qual modo está ativo.
       category: formatCategoryLabel(category),
       date,
+      goal_contribution: goalContribution,
     };
 
     try {
@@ -110,7 +170,12 @@ export function NewTransactionModal() {
         addToast("success", "Transação atualizada!");
       } else {
         await storage.createTransaction(transactionData);
-        addToast("success", "Transação adicionada!");
+        addToast(
+          "success",
+          goalContribution
+            ? `Transação adicionada! R$ ${goalContribution.amount.toFixed(2)} guardado na meta.`
+            : "Transação adicionada!",
+        );
       }
 
       closeModal();
@@ -127,6 +192,9 @@ export function NewTransactionModal() {
       // desses dados (resumo do dashboard, insights, extrato) escuta
       // este único evento para se manter sincronizada.
       window.dispatchEvent(new Event("transactions-changed"));
+      if (goalContribution) {
+        window.dispatchEvent(new Event("goals-changed"));
+      }
     } catch (error) {
       await handleFetchError(error, "Erro ao salvar transação:");
     } finally {
@@ -285,6 +353,69 @@ export function NewTransactionModal() {
               />
             </div>
           </div>
+
+          {/* "Guardar parte dessa receita numa meta" — só em receitas
+              novas (não em edição: mudar a alocação de uma transação já
+              existente fica fora desta versão, ver GUIA-COFRINHO.md). */}
+          {!editingId && type === "income" && goals.length > 0 && (
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
+              <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={allocateToGoal}
+                  onChange={(e) => setAllocateToGoal(e.target.checked)}
+                  className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 accent-emerald-500"
+                />
+                <PiggyBank size={16} className="text-emerald-500" />
+                Guardar parte para uma meta
+              </label>
+
+              {allocateToGoal && (
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <div>
+                    <label htmlFor="tx-goal" className="text-xs text-zinc-500 uppercase font-bold mb-1 block">
+                      Meta
+                    </label>
+                    <select
+                      id="tx-goal"
+                      value={allocationGoalId}
+                      onChange={(e) => setAllocationGoalId(e.target.value ? Number(e.target.value) : "")}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-sm focus:outline-none focus:border-emerald-500 transition-all"
+                      required={allocateToGoal}
+                    >
+                      <option value="">Selecione...</option>
+                      {goals.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.goal_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="tx-goal-amount" className="text-xs text-zinc-500 uppercase font-bold mb-1 block">
+                      Valor guardado
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 pointer-events-none">
+                        R$
+                      </span>
+                      <input
+                        id="tx-goal-amount"
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        placeholder="0,00"
+                        value={allocationAmount}
+                        onChange={(e) => setAllocationAmount(e.target.value)}
+                        className="font-figures w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 pl-9 text-sm focus:outline-none focus:border-emerald-500 transition-all"
+                        required={allocateToGoal}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <button
             type="submit"

@@ -1,18 +1,17 @@
 "use client";
 
-import { useState } from "react";
 import {
   LayoutDashboard,
   Wallet,
   Receipt,
   Settings,
   BrainCircuit,
-  Menu,
   X,
   UploadCloud,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSidebar } from "@/contexts/SidebarContext";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
@@ -43,24 +42,10 @@ function isRouteActive(pathname: string, href: string, allHrefs: string[]) {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(false);
-
-  const closeMenu = () => setIsOpen(false);
+  const { isOpen, close: closeMenu } = useSidebar();
 
   return (
     <>
-      {/* Botão hambúrguer — só existe em telas menores que "lg". O
-          top usa env(safe-area-inset-top) pra não ficar embaixo do
-          notch/relógio em iPhones com tela em "ilha dinâmica". */}
-      <button
-        onClick={() => setIsOpen(true)}
-        aria-label="Abrir menu"
-        className="fixed left-4 z-50 grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-zinc-800 bg-zinc-900 p-0 leading-none text-zinc-300 shadow-lg active:scale-95 transition-transform lg:hidden"
-        style={{ top: "calc(1rem + env(safe-area-inset-top))" }}
-      >
-        <Menu size={20} className="block" />
-      </button>
-
       {/* Fundo escurecido atrás do menu aberto no mobile */}
       {isOpen && (
         <div

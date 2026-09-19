@@ -6,12 +6,23 @@ from app.core.categorization import format_category_label
 from app.core.security import sanitize_text
 
 
+class GoalAllocation(BaseModel):
+    # "Guardar parte dessa receita numa meta" — preenchido só quando a
+    # transação é do tipo income e o usuário opta por destinar parte do
+    # valor a uma meta na hora de cadastrar (seção 2 do pedido). Nunca
+    # tratado como despesa: vira uma contribuição no "cofrinho" da meta,
+    # a transação continua registrando o valor cheio da receita.
+    goal_id: int
+    amount: float = Field(gt=0)
+
+
 class TransactionCreate(BaseModel):
     description: str = Field(min_length=2, max_length=120)
     amount: float = Field(gt=0)
     type: Literal["income", "expense"]
     category: str = Field(min_length=2, max_length=60)
     date: str = Field(min_length=10, max_length=40)
+    goal_contribution: Optional[GoalAllocation] = None
 
     @field_validator("description", "date")
     @classmethod
@@ -47,7 +58,31 @@ class GoalCreate(BaseModel):
         return sanitize_text(value) if value else value
 
 
+class GoalUpdate(BaseModel):
+    # Editar meta cobre só nome, valor alvo e prazo — o valor já guardado
+    # (current_amount) continua alterado exclusivamente por depósito
+    # (/deposit) ou conclusão (/complete), nunca por aqui, para não abrir
+    # um segundo caminho para o mesmo dado mudar.
+    name: str = Field(min_length=2, max_length=120)
+    target_amount: float = Field(gt=0)
+    deadline: Optional[str] = Field(default=None, max_length=40)
+
+    @field_validator("name")
+    @classmethod
+    def sanitize_name(cls, value: str) -> str:
+        return sanitize_text(value)
+
+    @field_validator("deadline")
+    @classmethod
+    def sanitize_deadline(cls, value: Optional[str]) -> Optional[str]:
+        return sanitize_text(value) if value else value
+
+
 class DepositCreate(BaseModel):
+    amount: float = Field(gt=0)
+
+
+class WithdrawCreate(BaseModel):
     amount: float = Field(gt=0)
 
 

@@ -30,6 +30,7 @@ class InsightService:
     def get_insights(self, user_id: int) -> dict:
         transactions = self.repository.list_transactions(user_id)
         goals = self.repository.list_goals(user_id)
+        contributions = self.repository.list_all_contributions(user_id)
 
         if not transactions:
             return {
@@ -283,6 +284,33 @@ class InsightService:
                     "metric_value": metric_value,
                 }
             )
+
+        # Contribuições reais para metas neste mês (seção 12 do pedido) —
+        # distinto da "Projeção de metas" acima, que é uma projeção a
+        # partir de receita menos despesa, não do que de fato foi
+        # guardado no cofrinho. Só aparece quando existe alguma
+        # contribuição líquida positiva no mês, pra não duplicar
+        # informação nem inventar um número a partir de nada.
+        contributions_this_month = [
+            c for c in contributions if self._parse_date(c["date"]).strftime("%Y-%m") == current_month_key
+        ]
+        if contributions_this_month:
+            net_this_month = sum(
+                -float(c["amount"]) if c["type"] == "withdrawal" else float(c["amount"])
+                for c in contributions_this_month
+            )
+            if net_this_month > 0:
+                insights.append(
+                    {
+                        "id": "goal-contributions-month",
+                        "type": "goal",
+                        "severity": "low",
+                        "title": "Contribuições para metas",
+                        "message": f"Você guardou R$ {net_this_month:.2f} para suas metas este mês.",
+                        "metric_label": "Guardado este mês",
+                        "metric_value": f"R$ {net_this_month:.2f}",
+                    }
+                )
 
         if forecast_expenses > current_incomes and current_incomes > 0:
             insights.append(

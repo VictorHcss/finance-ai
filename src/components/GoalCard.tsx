@@ -1,10 +1,21 @@
 "use client";
 import { useState } from "react";
-import { Calendar, CheckCircle2, Trash2, PlusCircle } from "lucide-react";
+import {
+  Calendar,
+  CheckCircle2,
+  Trash2,
+  PlusCircle,
+  MinusCircle,
+  Pencil,
+  History,
+  ChevronDown,
+  Target,
+} from "lucide-react";
 import { storage } from "@/lib/storage";
 import { formatCurrency } from "@/lib/utils";
 import type { Goal } from "@/lib/api";
 import { AddValueModal } from "./AddValueModal";
+import { GoalContributionsHistory } from "./GoalContributionsHistory";
 import { useToast } from "@/contexts/ToastContext";
 
 interface GoalCardProps {
@@ -14,6 +25,8 @@ interface GoalCardProps {
 
 export function GoalCard({ goal, onUpdate }: GoalCardProps) {
   const [isAddValueOpen, setIsAddValueOpen] = useState(false);
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const { addToast } = useToast();
   const isCompleted = goal.completed || goal.percent >= 100;
 
@@ -21,6 +34,7 @@ export function GoalCard({ goal, onUpdate }: GoalCardProps) {
     try {
       await storage.completeGoal(goal.id);
       onUpdate();
+      window.dispatchEvent(new Event("goals-changed"));
     } catch (err) {
       console.error(err);
       addToast("error", "Não foi possível concluir a meta agora. Tente novamente.");
@@ -36,12 +50,23 @@ export function GoalCard({ goal, onUpdate }: GoalCardProps) {
       try {
         await storage.deleteGoal(goal.id);
         onUpdate();
+        window.dispatchEvent(new Event("goals-changed"));
       } catch (err) {
         console.error(err);
         addToast("error", "Não foi possível excluir a meta agora. Tente novamente.");
       }
     }
   }
+
+  function handleEdit() {
+    window.dispatchEvent(new CustomEvent("open-goal-modal-edit", { detail: goal }));
+  }
+
+  // Planejador (seções 7-9): só mostra a seção quando há algo real pra
+  // dizer — uma meta recém-criada, sem prazo e sem nenhuma
+  // contribuição, não tem nada pra planejar ainda.
+  const hasPlanningInfo =
+    !isCompleted && (goal.deadline !== undefined && goal.deadline !== null || (goal.contributions_count ?? 0) > 0);
 
   return (
     <div className={`bg-zinc-900 border rounded-2xl p-6 transition-all relative group ${
@@ -71,9 +96,10 @@ export function GoalCard({ goal, onUpdate }: GoalCardProps) {
             {goal.deadline && (
               <>
                 <span className="text-zinc-700">•</span>
-                <span className="flex items-center gap-1">
+                <span className={`flex items-center gap-1 ${goal.deadline_passed && !isCompleted ? "text-amber-500" : ""}`}>
                   <Calendar size={14} />
                   {new Date(goal.deadline).toLocaleDateString('pt-BR')}
+                  {goal.deadline_passed && !isCompleted && " (vencido)"}
                 </span>
               </>
             )}
@@ -91,26 +117,42 @@ export function GoalCard({ goal, onUpdate }: GoalCardProps) {
           {/* Sempre visível no toque (abaixo de md); no desktop some até
               passar o mouse no card, igual antes. */}
           <div className="flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-            {!isCompleted && (
-              <>
-                <button 
-                  onClick={() => setIsAddValueOpen(true)}
-                  aria-label="Adicionar valor"
-                  className="p-2 hover:bg-emerald-500/10 hover:text-emerald-500 text-zinc-500 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold"
-                  title="Adicionar valor"
-                >
-                  <PlusCircle size={18} />
-                </button>
-                <button 
-                  onClick={handleComplete}
-                  aria-label="Concluir meta"
-                  className="p-2 hover:bg-emerald-500/10 hover:text-emerald-500 text-zinc-500 rounded-lg transition-colors"
-                  title="Concluir meta"
-                >
-                  <CheckCircle2 size={18} />
-                </button>
-              </>
+            <button
+              onClick={() => setIsAddValueOpen(true)}
+              aria-label="Guardar dinheiro na meta"
+              className="p-2 hover:bg-emerald-500/10 hover:text-emerald-500 text-zinc-500 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold"
+              title="Guardar dinheiro"
+            >
+              <PlusCircle size={18} />
+            </button>
+            {goal.current > 0 && (
+              <button
+                onClick={() => setIsWithdrawOpen(true)}
+                aria-label="Retirar dinheiro da meta"
+                className="p-2 hover:bg-rose-500/10 hover:text-rose-400 text-zinc-500 rounded-lg transition-colors"
+                title="Retirar dinheiro"
+              >
+                <MinusCircle size={18} />
+              </button>
             )}
+            {!isCompleted && (
+              <button 
+                onClick={handleComplete}
+                aria-label="Concluir meta"
+                className="p-2 hover:bg-emerald-500/10 hover:text-emerald-500 text-zinc-500 rounded-lg transition-colors"
+                title="Concluir meta"
+              >
+                <CheckCircle2 size={18} />
+              </button>
+            )}
+            <button 
+              onClick={handleEdit}
+              aria-label="Editar meta"
+              className="p-2 hover:bg-zinc-700/60 hover:text-zinc-200 text-zinc-500 rounded-lg transition-colors"
+              title="Editar meta"
+            >
+              <Pencil size={18} />
+            </button>
             <button 
               onClick={handleDelete}
               aria-label="Excluir meta"
@@ -190,15 +232,68 @@ export function GoalCard({ goal, onUpdate }: GoalCardProps) {
         )}
       </div>
 
-      {!isCompleted && (
-        <AddValueModal 
-          goalId={goal.id}
-          goalName={goal.goal_name}
-          isOpen={isAddValueOpen}
-          onClose={() => setIsAddValueOpen(false)}
-          onSuccess={onUpdate}
-        />
+      {/* Planejador — quanto guardar por mês até o prazo, e o ritmo real
+          baseado no histórico. Tudo conta simples e transparente, nunca
+          apresentado como "previsão de IA" (seções 7-9 do pedido). */}
+      {hasPlanningInfo && (
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          {goal.deadline && (
+            <div className="flex items-start gap-2 text-zinc-400">
+              <Target size={14} className="mt-0.5 shrink-0 text-zinc-500" />
+              {goal.deadline_passed ? (
+                <span>O prazo dessa meta já passou.</span>
+              ) : goal.monthly_target !== null && goal.monthly_target !== undefined ? (
+                <span>
+                  Guarde ~<span className="font-figures font-bold text-zinc-200">{formatCurrency(goal.monthly_target)}</span>/mês para bater o prazo.
+                </span>
+              ) : (
+                <span>Meta já atingida antes do prazo.</span>
+              )}
+            </div>
+          )}
+          <div className="flex items-start gap-2 text-zinc-400">
+            <History size={14} className="mt-0.5 shrink-0 text-zinc-500" />
+            {goal.has_enough_history && goal.avg_monthly_contribution ? (
+              <span>
+                No seu ritmo atual (~<span className="font-figures font-bold text-zinc-200">{formatCurrency(goal.avg_monthly_contribution)}</span>/mês),
+                faltam aproximadamente {goal.estimated_months} {goal.estimated_months === 1 ? "mês" : "meses"}.
+              </span>
+            ) : (
+              <span>Ainda precisamos de mais contribuições para estimar seu ritmo.</span>
+            )}
+          </div>
+        </div>
       )}
+
+      {/* Histórico do cofrinho (seção 5) — carregado só quando aberto */}
+      <div className="mt-3 border-t border-zinc-800/60 pt-2">
+        <button
+          onClick={() => setIsHistoryOpen((v) => !v)}
+          aria-expanded={isHistoryOpen}
+          className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors py-1"
+        >
+          <ChevronDown size={14} className={`transition-transform ${isHistoryOpen ? "rotate-180" : ""}`} />
+          {isHistoryOpen ? "Ocultar histórico" : "Ver histórico"}
+        </button>
+        {isHistoryOpen && <GoalContributionsHistory goalId={goal.id} onChange={onUpdate} />}
+      </div>
+
+      <AddValueModal
+        goalId={goal.id}
+        goalName={goal.goal_name}
+        isOpen={isAddValueOpen}
+        onClose={() => setIsAddValueOpen(false)}
+        onSuccess={onUpdate}
+      />
+      <AddValueModal
+        goalId={goal.id}
+        goalName={goal.goal_name}
+        isOpen={isWithdrawOpen}
+        onClose={() => setIsWithdrawOpen(false)}
+        onSuccess={onUpdate}
+        mode="withdraw"
+        availableBalance={goal.current}
+      />
     </div>
   );
 }

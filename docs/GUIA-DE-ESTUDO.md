@@ -328,8 +328,10 @@ style={{ marginBottom: "env(safe-area-inset-bottom)" }}
 
 Em qualquer celular sem notch, isso vale `0px` e não muda nada. Em quem
 tem, o navegador preenche esse valor automaticamente com o tamanho exato
-da área a evitar. Usei isso no botão hambúrguer (topo), no botão flutuante
-"+" (base/direita) e no rodapé da barra lateral.
+da área a evitar. Usei isso no botão flutuante "+" (base/direita) e no
+rodapé da barra lateral. *(O botão de abrir o menu no topo não usa mais
+`fixed`/`safe-area` — ele foi movido pra dentro do header normal; ver
+`docs/GUIA-RODADA-POLIMENTO.md`, seção 1, pra entender por quê.)*
 
 ### 7.4. Tabela de transações virando lista de cartões no celular
 

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { X, Target } from "lucide-react";
 import { storage } from "@/lib/storage";
 import { useToast } from "@/contexts/ToastContext";
+import type { Goal } from "@/lib/api";
 
 interface NewGoalModalProps {
   onSuccess?: () => void;
@@ -10,43 +11,80 @@ interface NewGoalModalProps {
 
 export function NewGoalModal({ onSuccess }: NewGoalModalProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [target, setTarget] = useState("");
   const [deadline, setDeadline] = useState("");
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
 
+  // Qualquer tela pode disparar este evento com uma meta existente pra
+  // abrir este mesmo formulário em modo de edição — mesma ideia do
+  // "open-transaction-modal" do NewTransactionModal, pra não duplicar
+  // o formulário de meta num componente separado só pra editar.
+  useEffect(() => {
+    function handleOpenForEdit(e: Event) {
+      const goal = (e as CustomEvent<Goal>).detail;
+      setEditingId(goal.id);
+      setName(goal.goal_name);
+      setTarget(String(goal.target));
+      setDeadline(goal.deadline ? goal.deadline.slice(0, 10) : "");
+      setIsOpen(true);
+    }
+
+    window.addEventListener("open-goal-modal-edit", handleOpenForEdit);
+    return () => window.removeEventListener("open-goal-modal-edit", handleOpenForEdit);
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setIsOpen(false);
+      if (e.key === "Escape") closeModal();
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
 
+  function closeModal() {
+    setIsOpen(false);
+    setEditingId(null);
+    setName("");
+    setTarget("");
+    setDeadline("");
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     try {
-      const newGoal = {
-        name,
-        target_amount: parseFloat(target),
-        current_amount: 0,
-        deadline,
-      };
+      if (editingId !== null) {
+        await storage.updateGoal(editingId, {
+          name,
+          target_amount: parseFloat(target),
+          deadline: deadline || null,
+        });
+      } else {
+        const newGoal = {
+          name,
+          target_amount: parseFloat(target),
+          current_amount: 0,
+          deadline,
+        };
+        await storage.createGoal(newGoal);
+      }
 
-      await storage.createGoal(newGoal);
-      
-      setIsOpen(false);
-      setName("");
-      setTarget("");
-      setDeadline("");
-      
+      closeModal();
+
       if (onSuccess) onSuccess();
+      window.dispatchEvent(new Event("goals-changed"));
     } catch (err) {
-      console.error("Erro ao criar meta:", err);
-      addToast("error", "Não foi possível criar a meta agora. Tente novamente.");
+      console.error("Erro ao salvar meta:", err);
+      addToast(
+        "error",
+        editingId !== null
+          ? "Não foi possível salvar as alterações agora. Tente novamente."
+          : "Não foi possível criar a meta agora. Tente novamente.",
+      );
     } finally {
       setLoading(false);
     }
@@ -72,9 +110,11 @@ export function NewGoalModal({ onSuccess }: NewGoalModalProps) {
         style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
       >
         <div className="flex justify-between items-center mb-6">
-          <h2 id="new-goal-modal-title" className="text-xl font-bold">Definir Nova Meta</h2>
+          <h2 id="new-goal-modal-title" className="text-xl font-bold">
+            {editingId !== null ? "Editar Meta" : "Definir Nova Meta"}
+          </h2>
           <button
-            onClick={() => setIsOpen(false)}
+            onClick={closeModal}
             aria-label="Fechar"
             className="flex h-9 w-9 items-center justify-center -mr-2 text-zinc-500 hover:text-zinc-300"
           >
@@ -111,7 +151,11 @@ export function NewGoalModal({ onSuccess }: NewGoalModalProps) {
             disabled={loading}
             className="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-lg font-bold transition-all disabled:opacity-50"
           >
-            {loading ? "Criando..." : "Criar Meta"}
+            {loading
+              ? "Salvando..."
+              : editingId !== null
+                ? "Salvar alterações"
+                : "Criar Meta"}
           </button>
         </form>
       </div>

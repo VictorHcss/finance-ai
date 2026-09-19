@@ -27,6 +27,11 @@ function withAuthHeaders(headers: HeadersInit = {}): HeadersInit {
     : headers;
 }
 
+export type GoalAllocation = {
+  goal_id: number;
+  amount: number;
+};
+
 export type Transaction = {
   id?: number;
   description: string;
@@ -38,6 +43,11 @@ export type Transaction = {
       "manual" (ou ausente, em respostas antigas/modo local) para as
       demais. Nunca setado pelo cliente — só o backend atribui. */
   source?: "manual" | "import";
+  /** Só usado ao CRIAR uma receita: destina parte do valor a uma meta
+      (o "cofrinho"). Nunca volta preenchido numa transação já salva —
+      quem quer saber se ela tem uma contribuição vinculada consulta o
+      histórico da meta (getGoalContributions), não este campo. */
+  goal_contribution?: GoalAllocation | null;
 };
 
 export type Goal = {
@@ -49,6 +59,31 @@ export type Goal = {
   percent: number;
   deadline?: string;
   completed: boolean;
+  /** Campos do planejador (seções 7-9): todos calculados, nunca "IA".
+      Ausentes/undefined em respostas de sessões antigas — tratar como
+      "sem essa informação", não como zero. */
+  deadline_passed?: boolean;
+  /** Quanto guardar por mês para bater o prazo — null sem prazo, com
+      prazo já vencido, ou com a meta já atingida. */
+  monthly_target?: number | null;
+  /** Ritmo real, calculado a partir do histórico de contribuições —
+      null sem histórico suficiente (menos de 2 contribuições). */
+  avg_monthly_contribution?: number | null;
+  /** Estimativa de meses até atingir a meta nesse ritmo — null sem
+      histórico suficiente ou com a meta já atingida. */
+  estimated_months?: number | null;
+  has_enough_history?: boolean;
+  contributions_count?: number;
+};
+
+export type GoalContribution = {
+  id: number;
+  goal_id: number;
+  type: "deposit" | "withdrawal";
+  amount: number;
+  source: string;
+  date: string;
+  transaction_id?: number | null;
 };
 
 export type GoalStatus = "active" | "completed" | "all";
@@ -405,6 +440,19 @@ export const api = {
     });
   },
 
+  updateGoal: async (
+    id: number,
+    data: { name: string; target_amount: number; deadline: string | null },
+  ) => {
+    return await fetchWithTimeout(`${API_URL}/goals/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+  },
+
   depositGoal: async (id: number, amount: number) => {
     return await fetchWithTimeout(`${API_URL}/goals/${id}/deposit`, {
       method: "POST",
@@ -412,6 +460,26 @@ export const api = {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ amount }),
+    });
+  },
+
+  withdrawGoal: async (id: number, amount: number) => {
+    return await fetchWithTimeout(`${API_URL}/goals/${id}/withdraw`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ amount }),
+    });
+  },
+
+  getGoalContributions: async (id: number): Promise<GoalContribution[]> => {
+    return await fetchWithTimeout(`${API_URL}/goals/${id}/contributions`);
+  },
+
+  deleteGoalContribution: async (goalId: number, contributionId: number) => {
+    return await fetchWithTimeout(`${API_URL}/goals/${goalId}/contributions/${contributionId}`, {
+      method: "DELETE",
     });
   },
 

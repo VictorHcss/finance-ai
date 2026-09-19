@@ -1,6 +1,7 @@
 import type {
   Transaction,
   Goal,
+  GoalContribution,
   InsightData,
   InsightEntry,
   DashboardSummary,
@@ -195,6 +196,169 @@ function computeGoalDerived(
   } as Goal;
 }
 
+// --- Cofrinho de metas (contribuições) ---
+//
+// Espelha exatamente a mesma modelagem do backend (ver
+// backend/app/services/finance_service.py e docs/GUIA-COFRINHO.md):
+// o saldo de uma meta nunca é editado direto, é sempre recalculado a
+// partir da soma das contribuições — depósitos somam, retiradas
+// subtraem. `transactionId` é preenchido só quando a contribuição
+// nasceu de uma receita com valor destinado à meta na hora do
+// cadastro (ver `createTransaction`).
+type LocalGoalContribution = GoalContribution;
+
+function buildUserContributionsKey(userId: number): string {
+  return userKey(userId, "goalContributions");
+}
+
+function loadContributions(userId: number): LocalGoalContribution[] {
+  return readLs<LocalGoalContribution[]>(buildUserContributionsKey(userId), []);
+}
+
+function saveContributions(userId: number, list: LocalGoalContribution[]): void {
+  writeLs(buildUserContributionsKey(userId), list);
+}
+
+function contributionsForGoal(userId: number, goalId: number): LocalGoalContribution[] {
+  return loadContributions(userId)
+    .filter((c) => c.goal_id === goalId)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.id - a.id);
+}
+
+function goalBalance(userId: number, goalId: number): number {
+  return contributionsForGoal(userId, goalId).reduce(
+    (sum, c) => sum + (c.type === "withdrawal" ? -c.amount : c.amount),
+    0,
+  );
+}
+
+/** Recalcula current/percent/missing/completed de uma meta a partir da
+ * soma real das contribuições, e persiste — nunca um incremento direto
+ * (mesma garantia do backend: o saldo nunca diverge da soma real,
+ * porque é sempre recalculado do zero, não ajustado incrementalmente). */
+function recomputeGoalBalance(userId: number, goalId: number): Goal | null {
+  const list = loadGoals(userId);
+  const idx = list.findIndex((g) => g.id === goalId);
+  if (idx === -1) return null;
+  const balance = Math.max(0, goalBalance(userId, goalId));
+  const updated = computeGoalDerived({
+    ...list[idx],
+    current: balance,
+    completed: balance >= list[idx].target,
+  });
+  list[idx] = updated;
+  saveGoals(userId, list);
+  return updated;
+}
+
+function nextContributionId(list: { id: number }[]): number {
+  return list.reduce((m, item) => Math.max(m, item.id), 0) + 1;
+}
+
+function createContributionRecord(
+  userId: number,
+  goalId: number,
+  type: "deposit" | "withdrawal",
+  amount: number,
+  source: string,
+  date: string,
+  transactionId: number | null = null,
+): LocalGoalContribution {
+  const list = loadContributions(userId);
+  const record: LocalGoalContribution = {
+    id: nextContributionId(list),
+    goal_id: goalId,
+    type,
+    amount,
+    source,
+    date,
+    transaction_id: transactionId,
+  };
+  list.push(record);
+  saveContributions(userId, list);
+  return record;
+}
+
+// Diferença em meses de calendário (não em dias/30) entre duas datas —
+// mesma fórmula do backend (`FinanceService._months_between`), pelos
+// mesmos motivos: simples e transparente, sem fingir mais precisão do
+// que a conta realmente tem.
+function monthsBetween(start: Date, end: Date): number {
+  return Math.max(0, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
+}
+
+function parseDateOnly(value?: string | null): Date | null {
+  if (!value) return null;
+  const d = new Date(value.length <= 10 ? `${value}T00:00:00` : value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+type GoalPlanning = {
+  deadline_passed: boolean;
+  monthly_target: number | null;
+  avg_monthly_contribution: number | null;
+  estimated_months: number | null;
+  has_enough_history: boolean;
+};
+
+/** Mesmas três regras do backend (seções 7-9 do pedido de evolução das
+ * metas) — ver `FinanceService._compute_goal_planning` pra a versão
+ * comentada por extenso. */
+function computeGoalPlanning(
+  target: number,
+  current: number,
+  deadline: string | null | undefined,
+  contributions: LocalGoalContribution[],
+  today: Date,
+): GoalPlanning {
+  const missing = Math.max(0, target - current);
+
+  let deadlinePassed = false;
+  let monthlyTarget: number | null = null;
+  const deadlineDate = parseDateOnly(deadline);
+  if (deadlineDate) {
+    if (deadlineDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+      deadlinePassed = true;
+    } else if (missing > 0) {
+      const monthsRemaining = Math.max(1, monthsBetween(today, deadlineDate));
+      monthlyTarget = Math.round((missing / monthsRemaining) * 100) / 100;
+    }
+  }
+
+  let avgMonthlyContribution: number | null = null;
+  let estimatedMonths: number | null = null;
+  const hasEnoughHistory = contributions.length >= 2;
+  if (hasEnoughHistory && missing > 0) {
+    const dates = contributions.map((c) => parseDateOnly(c.date)).filter((d): d is Date => d !== null);
+    if (dates.length > 0) {
+      const firstDate = dates.reduce((min, d) => (d < min ? d : min));
+      const elapsedMonths = Math.max(1, monthsBetween(firstDate, today) + 1);
+      const netTotal = contributions.reduce(
+        (sum, c) => sum + (c.type === "withdrawal" ? -c.amount : c.amount),
+        0,
+      );
+      if (netTotal > 0) {
+        avgMonthlyContribution = Math.round((netTotal / elapsedMonths) * 100) / 100;
+        estimatedMonths = Math.max(1, Math.ceil(missing / avgMonthlyContribution));
+      }
+    }
+  }
+
+  return {
+    deadline_passed: deadlinePassed,
+    monthly_target: monthlyTarget,
+    avg_monthly_contribution: avgMonthlyContribution,
+    estimated_months: estimatedMonths,
+    has_enough_history: hasEnoughHistory,
+  };
+}
+
+function goalWithPlanning(userId: number, goal: Goal, today: Date): Goal {
+  const contributions = contributionsForGoal(userId, goal.id);
+  const planning = computeGoalPlanning(goal.target, goal.current, goal.deadline, contributions, today);
+  return { ...goal, ...planning, contributions_count: contributions.length };
+}
+
 function sortTransactionsByDateDesc(txs: Transaction[]): Transaction[] {
   return [...txs].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
@@ -374,7 +538,7 @@ function round2(value: number): number {
  * e risco de déficit — usando os dados reais já salvos neste
  * navegador. Antes, o modo local sempre devolvia `insights: []`.
  */
-function computeInsights(txs: Transaction[], goals: Goal[]): InsightData | null {
+function computeInsights(txs: Transaction[], goals: Goal[], contributions: GoalContribution[] = []): InsightData | null {
   const expenses = txs.filter((t) => t.type === "expense");
   if (expenses.length === 0) return null;
 
@@ -628,6 +792,29 @@ function computeInsights(txs: Transaction[], goals: Goal[]): InsightData | null 
       metric_label: "Capacidade mensal",
       metric_value: metricValue,
     });
+  }
+
+  // Contribuições reais para metas neste mês — distinto da "Projeção de
+  // metas" acima (que projeta a partir de receita menos despesa, não
+  // do que de fato foi guardado no cofrinho). Só aparece quando há uma
+  // contribuição líquida positiva no mês.
+  const contributionsThisMonth = contributions.filter((c) => monthKeyOf(c.date) === currentMonthKey);
+  if (contributionsThisMonth.length > 0) {
+    const netThisMonth = contributionsThisMonth.reduce(
+      (sum, c) => sum + (c.type === "withdrawal" ? -c.amount : c.amount),
+      0,
+    );
+    if (netThisMonth > 0) {
+      insights.push({
+        id: "goal-contributions-month",
+        type: "goal",
+        severity: "low",
+        title: "Contribuições para metas",
+        message: `Você guardou R$ ${netThisMonth.toFixed(2)} para suas metas este mês.`,
+        metric_label: "Guardado este mês",
+        metric_value: `R$ ${netThisMonth.toFixed(2)}`,
+      });
+    }
   }
 
   if (forecastExpenses > currentIncomes && currentIncomes > 0) {
@@ -884,8 +1071,9 @@ const localStorageBackend = {
     const amount = Number(data.amount) || 0;
     const type = data.type === "expense" ? "expense" : "income";
     const date = data.date ?? new Date().toISOString();
+    const newId = nextId(list);
     const record: LocalTransactionRecord = {
-      id: nextId(list),
+      id: newId,
       description,
       amount,
       type,
@@ -898,6 +1086,27 @@ const localStorageBackend = {
     };
     list.push(record);
     saveTransactions(userId, list);
+
+    // "Guardar parte dessa receita numa meta" (mesma regra do backend,
+    // ver FinanceService._allocate_income_to_goal): só em receita, só
+    // até o valor da própria transação, e vira uma contribuição — nunca
+    // uma despesa nem um desconto no valor da receita registrada.
+    if (data.goal_contribution) {
+      const allocation = data.goal_contribution;
+      if (type !== "income") {
+        throw new Error("Só é possível destinar valor de uma transação de receita para uma meta.");
+      }
+      if (allocation.amount > amount) {
+        throw new Error("O valor destinado à meta não pode ser maior que o valor da receita.");
+      }
+      const goals = loadGoals(userId);
+      if (!goals.some((g) => g.id === allocation.goal_id)) {
+        throw new Error("Meta não encontrada");
+      }
+      createContributionRecord(userId, allocation.goal_id, "deposit", allocation.amount, description, date, newId);
+      recomputeGoalBalance(userId, allocation.goal_id);
+    }
+
     return record;
   },
 
@@ -909,25 +1118,71 @@ const localStorageBackend = {
     const list = loadTransactions(userId);
     const idx = list.findIndex((t) => t.id === id);
     if (idx === -1) throw new Error("Transação não encontrada");
+
+    // Edição não cria nem altera uma alocação de meta nesta versão — só
+    // impede uma alocação já existente ficar inconsistente (mesma regra
+    // do backend, ver FinanceService.update_transaction).
+    const changes = { ...data };
+    delete changes.goal_contribution;
+    const linked = loadContributions(userId).filter((c) => c.transaction_id === id);
+    if (linked.length > 0) {
+      const totalLinked = linked.reduce((sum, c) => sum + c.amount, 0);
+      const newType = changes.type ?? list[idx].type;
+      const newAmount = changes.amount !== undefined ? Number(changes.amount) : list[idx].amount;
+      if (newType !== "income" || newAmount < totalLinked) {
+        throw new Error(
+          `Essa transação tem R$ ${totalLinked.toFixed(2)} destinado a uma meta. ` +
+            "Remova a contribuição na meta antes de reduzir o valor ou mudar para despesa.",
+        );
+      }
+    }
+
     list[idx] = {
       ...list[idx],
-      ...data,
+      ...changes,
       id: list[idx].id,
     } as Transaction;
     saveTransactions(userId, list);
+
+    if (linked.length > 0 && changes.date) {
+      // Mantém a data da contribuição sincronizada com a transação
+      // editada — o valor em si não muda sozinho.
+      const contributions = loadContributions(userId).map((c) =>
+        c.transaction_id === id ? { ...c, date: changes.date as string } : c,
+      );
+      saveContributions(userId, contributions);
+    }
+
     return list[idx];
   },
 
   async deleteTransaction(id: number): Promise<void> {
     const userId = requireCurrentUserId();
+    const affectedGoalIds = new Set(
+      loadContributions(userId)
+        .filter((c) => c.transaction_id === id)
+        .map((c) => c.goal_id),
+    );
+
     const list = loadTransactions(userId).filter((t) => t.id !== id);
     saveTransactions(userId, list);
+
+    // Sem FK/cascade automático no localStorage — remove na mão as
+    // contribuições vinculadas antes de recalcular o saldo das metas
+    // afetadas, senão o dinheiro da transação excluída continuaria
+    // contado no cofrinho.
+    const remainingContributions = loadContributions(userId).filter((c) => c.transaction_id !== id);
+    saveContributions(userId, remainingContributions);
+    for (const goalId of affectedGoalIds) {
+      recomputeGoalBalance(userId, goalId);
+    }
   },
 
   // --- Goals ---
   async getGoalsStatus(): Promise<Goal[]> {
     const userId = requireCurrentUserId();
-    return loadGoals(userId);
+    const today = new Date();
+    return loadGoals(userId).map((g) => goalWithPlanning(userId, g, today));
   },
 
   async createGoal(data: Partial<Goal> & { name?: string; target_amount?: number; current_amount?: number }): Promise<Goal> {
@@ -936,9 +1191,10 @@ const localStorageBackend = {
     const goalName = data.goal_name ?? data.name ?? "Nova Meta";
     const target = Number(data.target ?? data.target_amount) || 0;
     const current = Number(data.current ?? data.current_amount) || 0;
+    const newId = nextId(list);
 
     const base: Omit<Goal, "missing" | "percent"> = {
-      id: nextId(list),
+      id: newId,
       goal_name: goalName,
       target,
       current,
@@ -948,35 +1204,106 @@ const localStorageBackend = {
     const record = computeGoalDerived(base);
     list.push(record);
     saveGoals(userId, list);
+
+    // Mesmo backfill do backend: um valor inicial informado na criação
+    // (current_amount > 0) precisa de uma contribuição por trás, senão
+    // ele "some" na primeira contribuição real que recalcular o saldo.
+    if (current > 0) {
+      createContributionRecord(userId, newId, "deposit", current, "Saldo inicial", new Date().toISOString());
+    }
+
     return record;
   },
 
-  async depositGoal(id: number, amount: number): Promise<Goal> {
+  async updateGoal(
+    id: number,
+    data: { name: string; target_amount: number; deadline: string | null },
+  ): Promise<Goal> {
     const userId = requireCurrentUserId();
     const list = loadGoals(userId);
     const idx = list.findIndex((g) => g.id === id);
     if (idx === -1) throw new Error("Meta não encontrada");
+
+    // Editar não mexe no valor já guardado (current) — só depósito e
+    // conclusão fazem isso. "completed" é recalculado contra o novo alvo,
+    // igual o backend faz, para os dois modos não divergirem.
+    const current = list[idx].current ?? 0;
+    const target = Number(data.target_amount) || 0;
     const updated = computeGoalDerived({
       ...list[idx],
-      current: (list[idx].current ?? 0) + Number(amount),
+      goal_name: data.name,
+      target,
+      deadline: data.deadline ?? undefined,
+      completed: current >= target,
     });
     list[idx] = updated;
     saveGoals(userId, list);
     return updated;
   },
 
-  async completeGoal(id: number): Promise<Goal> {
+  async depositGoal(id: number, amount: number): Promise<Goal> {
     const userId = requireCurrentUserId();
-    const list = loadGoals(userId);
-    const idx = list.findIndex((g) => g.id === id);
-    if (idx === -1) throw new Error("Meta não encontrada");
-    const updated = computeGoalDerived({
-      ...list[idx],
-      completed: true,
-      current: list[idx].target,
-    });
-    list[idx] = updated;
-    saveGoals(userId, list);
+    if (!loadGoals(userId).some((g) => g.id === id)) throw new Error("Meta não encontrada");
+    createContributionRecord(userId, id, "deposit", Number(amount), "Contribuição manual", new Date().toISOString());
+    const updated = recomputeGoalBalance(userId, id);
+    if (!updated) throw new Error("Meta não encontrada");
+    return updated;
+  },
+
+  async withdrawGoal(id: number, amount: number): Promise<Goal> {
+    const userId = requireCurrentUserId();
+    if (!loadGoals(userId).some((g) => g.id === id)) throw new Error("Meta não encontrada");
+    const currentBalance = goalBalance(userId, id);
+    if (Number(amount) > currentBalance) {
+      throw new Error("Não é possível retirar mais do que o valor guardado nessa meta.");
+    }
+    createContributionRecord(userId, id, "withdrawal", Number(amount), "Retirada", new Date().toISOString());
+    const updated = recomputeGoalBalance(userId, id);
+    if (!updated) throw new Error("Meta não encontrada");
+    return updated;
+  },
+
+  async getGoalContributions(id: number): Promise<GoalContribution[]> {
+    const userId = requireCurrentUserId();
+    if (!loadGoals(userId).some((g) => g.id === id)) throw new Error("Meta não encontrada");
+    return contributionsForGoal(userId, id);
+  },
+
+  async deleteGoalContribution(goalId: number, contributionId: number): Promise<void> {
+    const userId = requireCurrentUserId();
+    const list = loadContributions(userId);
+    const exists = list.some((c) => c.id === contributionId && c.goal_id === goalId);
+    if (!exists) throw new Error("Contribuição não encontrada");
+    saveContributions(
+      userId,
+      list.filter((c) => !(c.id === contributionId && c.goal_id === goalId)),
+    );
+    recomputeGoalBalance(userId, goalId);
+  },
+
+  async completeGoal(id: number): Promise<Goal> {
+    // Mesma regra do backend: a diferença até o alvo vira uma
+    // contribuição explícita no histórico, em vez de current_amount
+    // simplesmente pular pro alvo sem deixar rastro (ver
+    // FinanceService.complete_goal).
+    const userId = requireCurrentUserId();
+    const goal = loadGoals(userId).find((g) => g.id === id);
+    if (!goal) throw new Error("Meta não encontrada");
+
+    const currentBalance = goalBalance(userId, id);
+    const gap = goal.target - currentBalance;
+    if (gap > 0) {
+      createContributionRecord(
+        userId,
+        id,
+        "deposit",
+        gap,
+        "Meta marcada como concluída manualmente",
+        new Date().toISOString(),
+      );
+    }
+    const updated = recomputeGoalBalance(userId, id);
+    if (!updated) throw new Error("Meta não encontrada");
     return updated;
   },
 
@@ -984,6 +1311,12 @@ const localStorageBackend = {
     const userId = requireCurrentUserId();
     const list = loadGoals(userId).filter((g) => g.id !== id);
     saveGoals(userId, list);
+    // Sem FK/cascade no localStorage — remove na mão as contribuições
+    // da meta excluída, senão ficariam órfãs guardadas pra sempre.
+    saveContributions(
+      userId,
+      loadContributions(userId).filter((c) => c.goal_id !== id),
+    );
   },
 
   // --- Dashboard ---
@@ -1008,7 +1341,7 @@ const localStorageBackend = {
         insights: [],
       };
     }
-    const result = computeInsights(loadTransactions(userId), loadGoals(userId));
+    const result = computeInsights(loadTransactions(userId), loadGoals(userId), loadContributions(userId));
     return result ? { ...result, ai_enabled: true } : result;
   },
 

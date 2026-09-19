@@ -7,12 +7,12 @@ from app.core.dedupe import compute_dedupe_hash, normalize_description
 
 
 class FinanceRepository:
-    def create_transaction(self, user_id: int, payload: dict) -> None:
+    def create_transaction(self, user_id: int, payload: dict) -> int:
         now = datetime.now(timezone.utc).isoformat()
         normalized = normalize_description(payload["description"])
         dedupe_hash = compute_dedupe_hash(payload["date"], normalized, payload["amount"], payload["type"])
         with get_connection() as conn:
-            conn.execute(
+            cursor = conn.execute(
                 """
                 INSERT INTO transactions (
                     user_id, description, amount, type, category, date,
@@ -33,6 +33,15 @@ class FinanceRepository:
                 ),
             )
             conn.commit()
+            return cursor.lastrowid
+
+    def get_transaction(self, user_id: int, transaction_id: int) -> Optional[dict]:
+        with get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM transactions WHERE id = ? AND user_id = ?",
+                (transaction_id, user_id),
+            ).fetchone()
+        return dict(row) if row else None
 
     def list_transactions(self, user_id: int) -> List[dict]:
         with get_connection() as conn:
@@ -191,16 +200,24 @@ class FinanceRepository:
             conn.commit()
         return cursor.rowcount
 
-    def complete_goal(self, user_id: int, goal_id: int) -> int:
+    def update_goal(
+        self,
+        user_id: int,
+        goal_id: int,
+        name: str,
+        target_amount: float,
+        deadline: Optional[str],
+        completed: bool,
+    ) -> int:
         now = datetime.now(timezone.utc).isoformat()
         with get_connection() as conn:
             cursor = conn.execute(
                 """
                 UPDATE goals
-                SET completed = 1, current_amount = target_amount, updated_at = ?
+                SET name = ?, target_amount = ?, deadline = ?, completed = ?, updated_at = ?
                 WHERE id = ? AND user_id = ?
                 """,
-                (now, goal_id, user_id),
+                (name, target_amount, deadline, int(completed), now, goal_id, user_id),
             )
             conn.commit()
         return cursor.rowcount
@@ -213,6 +230,119 @@ class FinanceRepository:
             )
             conn.commit()
         return cursor.rowcount
+
+    # --- Cofrinho da meta (contribuições) ---
+
+    def create_contribution(
+        self,
+        user_id: int,
+        goal_id: int,
+        contribution_type: str,
+        amount: float,
+        source: str,
+        date: str,
+        transaction_id: Optional[int] = None,
+    ) -> int:
+        now = datetime.now(timezone.utc).isoformat()
+        with get_connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO goal_contributions (
+                    user_id, goal_id, transaction_id, type, amount, source, date, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (user_id, goal_id, transaction_id, contribution_type, amount, source, date, now),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def list_contributions(self, user_id: int, goal_id: int) -> List[dict]:
+        with get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM goal_contributions
+                WHERE user_id = ? AND goal_id = ?
+                ORDER BY date DESC, id DESC
+                """,
+                (user_id, goal_id),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_all_contributions(self, user_id: int) -> List[dict]:
+        with get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM goal_contributions WHERE user_id = ? ORDER BY date DESC, id DESC",
+                (user_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_contributions_by_transaction(self, user_id: int, transaction_id: int) -> List[dict]:
+        with get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM goal_contributions WHERE user_id = ? AND transaction_id = ?",
+                (user_id, transaction_id),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def sync_contribution_dates_for_transaction(self, user_id: int, transaction_id: int, new_date: str) -> None:
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE goal_contributions SET date = ? WHERE user_id = ? AND transaction_id = ?",
+                (new_date, user_id, transaction_id),
+            )
+            conn.commit()
+
+    def get_contribution(self, user_id: int, goal_id: int, contribution_id: int) -> Optional[dict]:
+        with get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM goal_contributions WHERE id = ? AND user_id = ? AND goal_id = ?",
+                (contribution_id, user_id, goal_id),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def delete_contribution(self, user_id: int, goal_id: int, contribution_id: int) -> int:
+        with get_connection() as conn:
+            cursor = conn.execute(
+                "DELETE FROM goal_contributions WHERE id = ? AND user_id = ? AND goal_id = ?",
+                (contribution_id, user_id, goal_id),
+            )
+            conn.commit()
+        return cursor.rowcount
+
+    def get_goal_balance(self, user_id: int, goal_id: int) -> float:
+        """Soma das contribuições (depósitos - retiradas) — a fonte da
+        verdade do saldo da meta. `current_amount` em `goals` é uma
+        cópia sempre recalculada a partir daqui (ver
+        `recompute_goal_balance`), nunca editada diretamente."""
+        with get_connection() as conn:
+            row = conn.execute(
+                """
+                SELECT COALESCE(SUM(
+                    CASE WHEN type = 'withdrawal' THEN -amount ELSE amount END
+                ), 0) AS balance
+                FROM goal_contributions
+                WHERE user_id = ? AND goal_id = ?
+                """,
+                (user_id, goal_id),
+            ).fetchone()
+        return float(row["balance"])
+
+    def recompute_goal_balance(self, user_id: int, goal_id: int) -> Optional[dict]:
+        """Recalcula current_amount/completed da meta a partir da soma
+        real das contribuições, e persiste. Chamado depois de qualquer
+        escrita que mude o "cofrinho" (nova contribuição, exclusão de
+        contribuição, exclusão de transação vinculada) — nunca faz um
+        incremento/decremento direto, sempre recalcula do zero, o que
+        evita o saldo divergir da soma real por causa de alguma edição
+        ou exclusão em outro lugar."""
+        goal = self.get_goal(user_id, goal_id)
+        if not goal:
+            return None
+        balance = max(0.0, self.get_goal_balance(user_id, goal_id))
+        completed = balance >= float(goal["target_amount"])
+        self.update_goal_progress(user_id, goal_id, balance, completed)
+        return self.get_goal(user_id, goal_id)
 
     def replace_insights(self, user_id: int, insights: List[dict]) -> None:
         now = datetime.now(timezone.utc).isoformat()

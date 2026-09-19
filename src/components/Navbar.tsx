@@ -1,8 +1,9 @@
 "use client";
 
-import { Bell, LogOut, Settings } from "lucide-react";
+import { Bell, LogOut, Menu, Settings } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSidebar } from "@/contexts/SidebarContext";
 import { usePathname } from "next/navigation";
 import { NotificationBadge, useNotificationsQuery } from "@/features/notifications";
 import { NotificationStatus } from "@/features/notifications/types";
@@ -25,6 +26,7 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
 
 export function Navbar() {
   const { user } = useAuth();
+  const { open: openMenu } = useSidebar();
   const pathname = usePathname();
   const unreadCountQuery = useNotificationsQuery(
     { status: NotificationStatus.Unread, page: 1, page_size: 1 },
@@ -54,12 +56,21 @@ export function Navbar() {
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
       <div className="flex items-center gap-3 md:gap-4 min-w-0">
-        {/* Espaço reservado pro botão hambúrguer flutuante do Sidebar,
-            que só existe abaixo de "lg" — esse spacer usava "md:hidden"
-            antes, um breakpoint diferente do hambúrguer ("lg:hidden"),
-            então em telas entre md e lg (tablets) o título ficava embaixo
-            do botão. Agora os dois usam o mesmo breakpoint. */}
-        <div className="w-11 lg:hidden shrink-0" />
+        {/* Botão que abre o Sidebar no mobile. Antes era um elemento
+            "fixed" fora do header, com um top calculado na mão
+            (1rem + safe-area) que não tinha nenhuma relação real com a
+            altura do header (h-14/h-16) nem com o "items-center" que
+            centraliza o título — por isso ficava visualmente torto.
+            Agora ele é só mais um item dentro do mesmo flex row do
+            header, então herda o alinhamento vertical do título de
+            graça, em vez de tentar recriá-lo com um número mágico. */}
+        <button
+          onClick={openMenu}
+          aria-label="Abrir menu"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-zinc-800 bg-zinc-900 leading-none text-zinc-300 shadow-sm active:scale-95 transition-transform lg:hidden"
+        >
+          <Menu size={20} className="block" />
+        </button>
         <div className="min-w-0">
           <h1 className="text-base md:text-lg font-bold tracking-tight truncate">
             {page.title}

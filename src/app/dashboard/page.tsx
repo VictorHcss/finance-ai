@@ -7,6 +7,7 @@ import { ArrowUpRight, ArrowDownRight, DollarSign, Sparkles } from "lucide-react
 import Link from "next/link";
 
 import { TransactionList } from "@/components/TransactionList";
+import { GoalsSummaryWidget } from "@/components/GoalsSummaryWidget";
 import { storage } from "@/lib/storage";
 import type { InsightData, DashboardSummary } from "@/lib/api";
 import { AppLayout } from "@/components/AppLayout";
@@ -177,6 +178,8 @@ export default function Home() {
       <section>
         <FinanceChart />
       </section>
+
+      <GoalsSummaryWidget />
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <TransactionList />
