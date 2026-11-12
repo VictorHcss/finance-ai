@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "backend": "cd backend && uvicorn app.main:app --reload",
-    "dev:all": "concurrently \"npm run backend\" \"npm run dev\"",
+    "landing": "npm --prefix landing run dev",
+    "dev:all": "concurrently \"npm run backend\" \"npm run dev\" \"npm run landing\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

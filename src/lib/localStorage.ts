@@ -1555,16 +1555,6 @@ const localStorageBackend = {
     );
   },
 
-  async resetDatabase(): Promise<void> {
-    const userId = getCurrentLocalUserId();
-    if (userId !== null) {
-      saveTransactions(userId, []);
-      saveGoals(userId, []);
-      saveNotifications(userId, []);
-      saveImportBatches(userId, []);
-      saveStagedRows(userId, []);
-    }
-  },
 };
 
 export const localStorageNotificationsService: LocalNotificationsService = {

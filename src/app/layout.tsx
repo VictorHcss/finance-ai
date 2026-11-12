@@ -1,6 +1,17 @@
 import "./globals.css";
 import { Manrope, JetBrains_Mono } from "next/font/google";
-import { AppProviders } from "@/components/providers";
+import type { Metadata } from "next";
+
+// Layout raiz: HTML, fontes e CSS. Os providers de autenticação/dados vivem
+// em (app)/layout.tsx. A landing page é um projeto separado (pasta landing/).
+export const metadata: Metadata = {
+  title: {
+    default: "Finance.AI — controle financeiro pessoal",
+    template: "%s · Finance.AI",
+  },
+  description:
+    "Dashboard, metas, transações e insights gerados a partir do seu histórico financeiro real.",
+};
 
 // Manrope carrega a interface (textos, títulos, botões): uma geométrica
 // contemporânea, com um pouco mais de personalidade que a Inter padrão.
@@ -32,7 +43,7 @@ export default function RootLayout({
       className={`${manrope.variable} ${jetbrainsMono.variable}`}
     >
       <body className="bg-background text-foreground min-h-screen font-sans antialiased">
-        <AppProviders>{children}</AppProviders>
+        {children}
       </body>
     </html>
   );

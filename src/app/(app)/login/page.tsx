@@ -16,11 +16,34 @@ export default function LoginPage() {
   const { addToast } = useToast();
   const router = useRouter();
 
+  const [demoStarted, setDemoStarted] = useState(false);
+
   useEffect(() => {
     if (!authLoading && session) {
       router.replace("/dashboard");
     }
   }, [authLoading, session, router]);
+
+  // "Acessar a conta de demonstração" na landing aponta para /login?demo=1.
+  // A landing não carrega o AuthContext, então o login da demo acontece aqui.
+  // window.location (e não useSearchParams) evita exigir <Suspense> na página.
+  useEffect(() => {
+    if (authLoading || session || demoStarted) return;
+    if (new URLSearchParams(window.location.search).get("demo") !== "1") return;
+
+    setDemoStarted(true);
+    setLoading(true);
+    login("demo@finance.ai", "demo123456")
+      .then(() => router.replace("/dashboard"))
+      .catch(() => {
+        addToast(
+          "error",
+          "Não foi possível abrir a demonstração agora. Tente novamente em instantes.",
+        );
+        router.replace("/login");
+      })
+      .finally(() => setLoading(false));
+  }, [authLoading, session, demoStarted, login, router, addToast]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

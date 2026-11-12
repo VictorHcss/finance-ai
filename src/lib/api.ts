@@ -388,11 +388,6 @@ export const api = {
     return await fetchWithTimeout(url, requestOptions);
   },
 
-  // Utility
-  resetDatabase: () =>
-    fetchWithTimeout(`${API_URL}/reset`, {
-      method: "DELETE",
-    }),
   // Transactions
 
   getTransactions: async (): Promise<Transaction[]> => {

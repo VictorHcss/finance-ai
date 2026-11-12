@@ -189,19 +189,6 @@ export const storage = {
     }
   },
 
-  resetDatabase: async () => {
-    const mode = await resolveModeForWrite();
-    if (mode === "local") return localStorageApi.resetDatabase();
-    try {
-      return await api.resetDatabase();
-    } catch (err) {
-      if (isBackendUnavailableError(err)) {
-        setMode("local");
-        return localStorageApi.resetDatabase();
-      }
-      throw err;
-    }
-  },
 
   // --- Auth ---
   login: async (data: { email: string; password: string }): Promise<AuthSession> =>

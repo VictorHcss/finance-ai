@@ -24,8 +24,24 @@ def get_allowed_origins() -> List[str]:
     return [origin.strip() for origin in raw_value.split(",") if origin.strip()]
 
 
+DEV_SECRET_KEY = "dev-secret-key-change-in-production"
+
+
 def get_secret_key() -> str:
-    return os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+    return os.getenv("SECRET_KEY", DEV_SECRET_KEY)
+
+
+def validate_production_config() -> None:
+    """Impede subir fora de desenvolvimento com a chave padrão (pública no código)."""
+    if get_environment() == "development":
+        return
+    secret = os.getenv("SECRET_KEY", "")
+    if not secret or secret == DEV_SECRET_KEY or len(secret) < 32:
+        raise RuntimeError(
+            "SECRET_KEY ausente, padrão ou curta demais (mínimo 32 caracteres). "
+            "Defina uma chave forte antes de rodar com ENVIRONMENT="
+            f"{get_environment()!r}."
+        )
 
 
 def get_jwt_secret() -> str:

@@ -72,3 +72,31 @@ def test_logout_invalida_o_token(client, auth_headers):
     # O mesmo token não deve mais servir para autenticar depois do logout.
     resp2 = client.get("/api/auth/profile", headers=auth_headers)
     assert resp2.status_code == 401
+
+
+def test_login_bloqueia_apos_muitas_falhas(client):
+    for _ in range(5):
+        resp = client.post("/api/auth/login", json={"email": "demo@finance.ai", "password": "senha-errada"})
+        assert resp.status_code == 401
+    resp = client.post("/api/auth/login", json={"email": "demo@finance.ai", "password": "demo123456"})
+    assert resp.status_code == 429
+    assert "Retry-After" in resp.headers
+
+
+def test_forgot_password_nao_revela_se_email_existe(client):
+    existente = client.post("/api/auth/forgot-password", json={"email": "demo@finance.ai"}).json()
+    inexistente = client.post("/api/auth/forgot-password", json={"email": "ninguem@teste.com"}).json()
+    assert existente == inexistente
+
+
+def test_producao_exige_secret_key(monkeypatch):
+    import pytest
+
+    from app.core.config import validate_production_config
+
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    with pytest.raises(RuntimeError):
+        validate_production_config()
+    monkeypatch.setenv("SECRET_KEY", "x" * 40)
+    validate_production_config()

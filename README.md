@@ -2,7 +2,7 @@
 
 Controle financeiro pessoal com dashboard, metas, transações e insights gerados a partir do histórico real de cada conta.
 
-Landing pública em `/`, app autenticado a partir de `/dashboard`. Funciona com backend real (FastAPI + SQLite) ou em modo local (`localStorage`) quando o backend está indisponível.
+Dois frontends: a landing pública (`landing/`, site estático) e o app (`src/`, que será empacotado como aplicativo). Funciona com backend real (FastAPI + SQLite) ou em modo local (`localStorage`) quando o backend está indisponível.
 
 ## Stack
 
@@ -16,7 +16,8 @@ Landing pública em `/`, app autenticado a partir de `/dashboard`. Funciona com 
 
 ```bash
 cd backend
-pip install fastapi uvicorn --break-system-packages   # ou num virtualenv
+python -m venv venv && venv\Scripts\activate   # Linux/Mac: source venv/bin/activate
+pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
@@ -36,7 +37,18 @@ npm run dev
 
 Sobe em `http://localhost:3000`.
 
-### 3. Os dois juntos
+### 3. Landing page (projeto separado)
+
+A landing fica em `landing/`, com dependências próprias, e é exportada como site estático (`landing/out/`). Os botões dela apontam para o app via `NEXT_PUBLIC_APP_URL` (ver `landing/.env.example`).
+
+```bash
+cd landing
+npm install
+npm run dev      # http://localhost:3010
+npm run build    # gera landing/out/ para hospedar em qualquer lugar
+```
+
+### 4. Tudo junto (backend + app + landing)
 
 ```bash
 npm run dev:all
@@ -71,6 +83,8 @@ backend/
 
 src/
   app/              → páginas (App Router) — uma pasta por rota
+    (app)/          → o sistema (login, cadastro, dashboard...): tem os providers de auth/dados;
+                      `/` só redireciona para /dashboard ou /login. É esta parte que vira aplicativo
   components/       → componentes de UI compartilhados
   components/ui/    → biblioteca de componentes primitivos (Button, Dialog, Tabs...)
   features/notifications/ → módulo isolado de notificações (hooks, tipos, serviço)

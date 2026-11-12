@@ -4,7 +4,7 @@ import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.config import get_allowed_origins
+from app.core.config import get_allowed_origins, validate_production_config
 from app.core.database import init_db
 from app.routers.auth import router as auth_router
 from app.routers.dashboard import router as dashboard_router
@@ -19,11 +19,15 @@ from app.services.audit_service import register_audit_event_handler
 
 
 if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
+    # reconfigure() mantém o mesmo stream; trocar por um TextIOWrapper novo
+    # fechava o buffer original e quebrava a captura de saída do pytest.
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8")
 
 
 def create_app() -> FastAPI:
+    validate_production_config()
     app = FastAPI(title="Finance.AI API", version="0.2.0")
 
     app.add_middleware(

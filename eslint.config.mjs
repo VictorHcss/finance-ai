@@ -19,6 +19,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // A landing é um projeto separado, com o próprio eslint.config.mjs.
+    "landing/**",
   ]),
 ]);
 

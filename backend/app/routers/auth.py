@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
+from app.core import rate_limit
+from app.core.security import sanitize_text
 from app.dependencies import get_current_user_id
 from app.schemas.auth import (
     AuthResponse,
@@ -22,8 +24,26 @@ def register(payload: RegisterRequest) -> dict:
 
 
 @router.post("/login", response_model=AuthResponse)
-def login(payload: LoginRequest) -> dict:
-    return service.login(payload.email, payload.password)
+def login(payload: LoginRequest, request: Request) -> dict:
+    ip = request.client.host if request.client else "unknown"
+    email = sanitize_text(payload.email).lower()
+
+    wait = rate_limit.retry_after_seconds(ip, email)
+    if wait:
+        raise HTTPException(
+            status_code=429,
+            detail="Muitas tentativas de login. Tente novamente em alguns minutos.",
+            headers={"Retry-After": str(wait)},
+        )
+
+    try:
+        result = service.login(payload.email, payload.password)
+    except HTTPException as exc:
+        if exc.status_code == 401:
+            rate_limit.register_failure(ip, email)
+        raise
+    rate_limit.register_success(ip, email)
+    return result
 
 
 @router.post("/logout")

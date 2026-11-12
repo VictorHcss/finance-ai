@@ -16,6 +16,10 @@ def client(tmp_path, monkeypatch):
     db_path = str(tmp_path / "finance_test.db")
     monkeypatch.setattr("app.core.database.DB_PATH", db_path)
 
+    from app.core import rate_limit
+
+    rate_limit.reset()
+
     from app.core.database import init_db
 
     init_db()

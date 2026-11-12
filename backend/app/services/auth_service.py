@@ -46,15 +46,16 @@ class AuthService:
         return {"status": "success", "message": "Sessão encerrada"}
 
     def forgot_password(self, email: str) -> dict:
-        normalized_email = sanitize_text(email).lower()
-        user_exists = self.repository.get_user_by_email(normalized_email) is not None
+        # A resposta é sempre a mesma, exista ou não a conta — senão o
+        # endpoint revela quais e-mails estão cadastrados.
+        # TODO: quando houver provedor de e-mail, enviar o link aqui se
+        # sanitize_text(email).lower() existir.
         return {
             "status": "success",
             "message": (
-                "Fluxo de recuperação preparado. "
-                "Implemente o provedor de e-mail para concluir o reset."
+                "Se houver uma conta com esse e-mail, enviaremos as "
+                "instruções de recuperação."
             ),
-            "email_sent": user_exists,
         }
 
     def get_profile(self, user_id: int) -> dict:

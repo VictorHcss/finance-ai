@@ -7,12 +7,14 @@
 - **Hash de senha correto**: PBKDF2-HMAC-SHA256, salt aleatório por usuário, 100 mil iterações, comparação em tempo constante (`hmac.compare_digest`) — evita ataque de timing.
 - **CORS restrito** a uma lista explícita de origens (`ALLOWED_ORIGINS`), não mais `*`.
 - **Erros 401 escondidos como "sem dados"**: cada tela engolia qualquer erro (incluindo falha de autenticação) e mostrava listas vazias, como se o usuário não tivesse nada cadastrado. Corrigido — 401 agora força logout e avisa que a sessão expirou.
+- **Rate limiting no login**: 5 falhas seguidas para o mesmo IP+e-mail (ou 20 do mesmo IP) bloqueiam novas tentativas por 15 minutos, com resposta `429` e `Retry-After`. Fica em memória (`app/core/rate_limit.py`) — com vários processos/servidores, trocar por Redis.
+- **`SECRET_KEY` obrigatória fora de desenvolvimento**: com `ENVIRONMENT` diferente de `development`, o backend se recusa a subir sem uma chave própria de pelo menos 32 caracteres.
+- **"Esqueci a senha" não revela mais se o e-mail existe**: a resposta é idêntica para contas existentes e inexistentes.
+- **Backend legado removido**: `backend/main.py` (sem autenticação, CORS `*` e com um `DELETE /api/reset` que apagava tudo) foi apagado.
+- **`backend/finance.db` removido do git** — estava versionado apesar do `.gitignore`. Atenção: ele continua no histórico de commits antigos.
 
 ## Ainda precisa de atenção antes de produção
 
-- **`SECRET_KEY`/`JWT_SECRET` com valor padrão de desenvolvimento** (`dev-secret-key-change-in-production`) caso a variável de ambiente não seja definida. Trocar por um valor real e único antes de qualquer deploy público — hoje, se alguém descobrir esse valor padrão (é só ler o código-fonte), consegue forjar qualquer coisa que dependa dele.
 - **`jwt_payload` não é assinado** — é só base64 do payload, sem HMAC/assinatura. Não é usado hoje para autenticar nada, mas também não deve ser usado assim no futuro sem antes implementar assinatura de verdade (ex: biblioteca `python-jose` ou `pyjwt`).
 - **Sessão fica só em `localStorage`**, acessível via JavaScript (vulnerável a XSS, caso algum dia exista uma injeção de script). Migrar para cookie `HttpOnly` + `Secure` + `SameSite` é mais seguro, mas exige mudanças no fluxo de CORS/credentials.
 - **Recuperação de senha não envia e-mail de verdade** — o endpoint existe e responde com sucesso, mas não há integração com provedor de e-mail. Enquanto isso não existir, o "esqueci minha senha" é só uma tela, sem efeito real.
-- **Sem rate limiting** em `/api/auth/login` — nada impede tentativas de força bruta contra uma conta hoje. Vale considerar um limite de tentativas por IP/e-mail antes de expor publicamente.
-- **`finance.db` não deve ser versionado** (já está no `.gitignore`, mas vale conferir sempre antes de um `git add .` apressado) — ele contém hashes de senha e dados financeiros reais assim que alguém usar o sistema de verdade.
