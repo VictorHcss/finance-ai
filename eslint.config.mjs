@@ -21,6 +21,9 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // A landing é um projeto separado, com o próprio eslint.config.mjs.
     "landing/**",
+    // Projetos nativos do Capacitor (contêm cópias do build web).
+    "android/**",
+    "ios/**",
   ]),
 ]);
 

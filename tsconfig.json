@@ -38,6 +38,9 @@
   ],
   "exclude": [
     "node_modules",
-    "landing"
+    "landing",
+    "android",
+    "ios",
+    "out"
   ]
 }

@@ -76,6 +76,26 @@ npm run dev:all
 
 Depois que a API subir no Render, coloque a URL dela em `NEXT_PUBLIC_API_URL` no projeto do app na Vercel e faça um novo deploy (variáveis `NEXT_PUBLIC_` entram no build).
 
+## Aplicativo (Android, com Capacitor)
+
+O app de celular usa o mesmo código de `src/`: o Next é exportado como arquivos estáticos (`out/`) e o [Capacitor](https://capacitorjs.com) empacota isso num projeto Android nativo (`android/`).
+
+**Pré-requisito:** [Android Studio](https://developer.android.com/studio) instalado (já inclui o JDK e o SDK).
+
+```bash
+# 1. Gera o export estático apontando para a API de produção e copia para android/
+npm run build:mobile -- --api=https://<sua-api>.onrender.com/api
+
+# 2. Abre no Android Studio (de lá: Run ▶ no emulador/celular, ou Build → Generate Signed Bundle)
+npm run android
+```
+
+- A URL da API é obrigatória e precisa ser `https` — dentro do celular, `localhost` é o próprio aparelho.
+- O app Android chama a API com a origem `https://localhost`; ela já está no `ALLOWED_ORIGINS` do `render.yaml`.
+- Sempre que mudar algo em `src/`, rode o passo 1 de novo.
+- O `appId` (`com.financeai.app`, em `capacitor.config.ts`) é a identidade do app na Play Store e **não pode mudar depois de publicado**.
+- **iOS** precisa de um Mac com Xcode (`npm install @capacitor/ios && npx cap add ios`).
+
 ## Modo local (sem backend)
 
 Se o backend estiver fora do ar, o frontend detecta automaticamente (`checkBackendAvailability()` em `src/lib/storage.ts`) e passa a usar `localStorage` para tudo — login, transações, metas, notificações. É útil para demonstração offline, mas **os dois modos não sincronizam entre si**: dados criados em modo local não aparecem depois quando o backend voltar, e vice-versa.

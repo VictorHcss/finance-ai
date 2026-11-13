@@ -31,6 +31,7 @@ services:
         generateValue: true
       - key: DATABASE_URL
         value: sqlite:////var/data/finance.db
-      # Endereço do app (sem barra no final). Vários: separe por vírgula.
+      # Origens que podem chamar a API (sem barra no final, separadas por vírgula):
+      #   app na Vercel, app Android (Capacitor) e app iOS (Capacitor).
       - key: ALLOWED_ORIGINS
-        value: https://finance-ai-flame-six.vercel.app
+        value: https://finance-ai-flame-six.vercel.app,https://localhost,capacitor://localhost
