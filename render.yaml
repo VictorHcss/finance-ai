@@ -1,0 +1,36 @@
+# Blueprint do Render para a API (backend/).
+# No painel do Render: New → Blueprint → escolha este repositório.
+#
+# O SQLite precisa de disco persistente, que só existe em plano pago
+# (Starter ou acima). No plano free o disco é apagado a cada deploy/reinício
+# e os dados somem.
+services:
+  - type: web
+    name: finance-ai-api
+    runtime: python
+    rootDir: backend
+    plan: starter
+    region: virginia # mais perto da Vercel (iad1)
+    buildCommand: pip install -r requirements.txt
+    # --proxy-headers: o Render fica na frente como proxy; sem isso todo
+    # mundo teria o mesmo IP e o limite de tentativas de login bloquearia
+    # usuários inocentes juntos.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+    healthCheckPath: /
+    autoDeploy: true
+    disk:
+      name: finance-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: ENVIRONMENT
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        value: sqlite:////var/data/finance.db
+      # Endereço do app (sem barra no final). Vários: separe por vírgula.
+      - key: ALLOWED_ORIGINS
+        value: https://finance-ai-flame-six.vercel.app

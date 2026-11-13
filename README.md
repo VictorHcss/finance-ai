@@ -17,7 +17,7 @@ Dois frontends: a landing pública (`landing/`, site estático) e o app (`src/`,
 ```bash
 cd backend
 python -m venv venv && venv\Scripts\activate   # Linux/Mac: source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # produção + pytest (requirements.txt é só produção)
 uvicorn app.main:app --reload
 ```
 
@@ -58,11 +58,23 @@ npm run dev:all
 
 | Variável | Onde | Padrão | Descrição |
 |---|---|---|---|
-| `NEXT_PUBLIC_API_URL` | frontend | `http://localhost:8000/api` | URL base da API |
+| `NEXT_PUBLIC_API_URL` | app | `http://localhost:8000/api` | URL base da API |
+| `NEXT_PUBLIC_APP_URL` | landing | `http://localhost:3000` | Endereço do app, para os botões da landing (produção em `landing/.env.production`) |
 | `ALLOWED_ORIGINS` | backend | `http://localhost:3000` | Origens liberadas no CORS (separadas por vírgula) |
-| `SECRET_KEY` / `JWT_SECRET` | backend | valor de desenvolvimento | **Trocar obrigatoriamente em produção** |
+| `ENVIRONMENT` | backend | `development` | Fora de `development`, o backend exige uma `SECRET_KEY` forte para subir |
+| `SECRET_KEY` / `JWT_SECRET` | backend | valor de desenvolvimento | **Trocar obrigatoriamente em produção** (mín. 32 caracteres) |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | backend | `60` | Usado no payload informativo de JWT (ver nota em `docs/ARQUITETURA.md`) |
-| `DATABASE_URL` | backend | `sqlite:///./finance.db` | Caminho do banco |
+| `DATABASE_URL` | backend | `backend/finance.db` | Só SQLite: `sqlite:///./arquivo.db` (relativo a `backend/`) ou `sqlite:////caminho/absoluto.db` |
+
+## Deploy
+
+| Parte | Onde | Configuração |
+|---|---|---|
+| Landing (`landing/`) | Vercel | Root Directory = `landing`. Os links usam `landing/.env.production` |
+| App (raiz) | Vercel | Root Directory = raiz. Definir `NEXT_PUBLIC_API_URL` = `https://<api>.onrender.com/api` |
+| API (`backend/`) | Render | `render.yaml` na raiz (New → Blueprint). Precisa de plano pago por causa do disco do SQLite |
+
+Depois que a API subir no Render, coloque a URL dela em `NEXT_PUBLIC_API_URL` no projeto do app na Vercel e faça um novo deploy (variáveis `NEXT_PUBLIC_` entram no build).
 
 ## Modo local (sem backend)
 

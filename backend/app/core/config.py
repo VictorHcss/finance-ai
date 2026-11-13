@@ -4,7 +4,33 @@ from urllib.parse import urlparse
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DB_PATH = os.path.join(BASE_DIR, "finance.db")
+DEFAULT_DB_PATH = os.path.join(BASE_DIR, "finance.db")
+
+
+def _resolve_db_path() -> str:
+    """Lê DATABASE_URL (só SQLite por enquanto).
+
+    - sqlite:///./finance.db      → relativo à pasta backend/
+    - sqlite:////var/data/finance.db → caminho absoluto (ex.: disco do Render)
+    """
+    url = os.getenv("DATABASE_URL", "").strip()
+    if not url:
+        return DEFAULT_DB_PATH
+    prefix = "sqlite:///"
+    if not url.startswith(prefix):
+        raise RuntimeError(
+            "DATABASE_URL precisa ser SQLite (sqlite:///caminho/finance.db); "
+            "outros bancos ainda não são suportados."
+        )
+    path = url[len(prefix):]
+    if not os.path.isabs(path):
+        path = os.path.join(BASE_DIR, path)
+    path = os.path.normpath(path)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    return path
+
+
+DB_PATH = _resolve_db_path()
 
 DEFAULT_ALLOWED_ORIGINS = [
     "http://localhost:3000",
@@ -13,7 +39,7 @@ DEFAULT_ALLOWED_ORIGINS = [
 
 
 def get_database_url() -> str:
-    return os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
+    return f"sqlite:///{DB_PATH}"
 
 
 def get_allowed_origins() -> List[str]:
