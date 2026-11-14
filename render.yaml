@@ -1,15 +1,18 @@
 # Blueprint do Render para a API (backend/).
 # No painel do Render: New → Blueprint → escolha este repositório.
 #
-# O SQLite precisa de disco persistente, que só existe em plano pago
-# (Starter ou acima). No plano free o disco é apagado a cada deploy/reinício
-# e os dados somem.
+# PLANO GRATUITO (sem cartão) — limitações importantes:
+# - Sem disco persistente: o SQLite é apagado a cada deploy/reinício, e as
+#   contas e transações somem. Serve para testar, não para usuários reais.
+#   O definitivo é usar um Postgres gratuito externo (Neon/Supabase).
+# - A API "dorme" após ~15 min sem uso; o primeiro acesso depois disso
+#   demora cerca de 50 segundos.
 services:
   - type: web
     name: finance-ai-api
     runtime: python
     rootDir: backend
-    plan: starter
+    plan: free
     region: virginia # mais perto da Vercel (iad1)
     buildCommand: pip install -r requirements.txt
     # --proxy-headers: o Render fica na frente como proxy; sem isso todo
@@ -18,10 +21,6 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
     healthCheckPath: /
     autoDeploy: true
-    disk:
-      name: finance-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.10
@@ -29,8 +28,7 @@ services:
         value: production
       - key: SECRET_KEY
         generateValue: true
-      - key: DATABASE_URL
-        value: sqlite:////var/data/finance.db
+      # Sem DATABASE_URL: usa backend/finance.db no disco temporário.
       # Origens que podem chamar a API (sem barra no final, separadas por vírgula):
       #   app na Vercel, app Android (Capacitor) e app iOS (Capacitor).
       - key: ALLOWED_ORIGINS

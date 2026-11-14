@@ -72,7 +72,7 @@ npm run dev:all
 |---|---|---|
 | Landing (`landing/`) | Vercel | Root Directory = `landing`. Os links usam `landing/.env.production` |
 | App (raiz) | Vercel | Root Directory = raiz. Definir `NEXT_PUBLIC_API_URL` = `https://<api>.onrender.com/api` |
-| API (`backend/`) | Render | `render.yaml` na raiz (New → Blueprint). Precisa de plano pago por causa do disco do SQLite |
+| API (`backend/`) | Render | `render.yaml` na raiz (New → Blueprint). Plano gratuito: **o SQLite é apagado a cada deploy/reinício** e a API dorme após ~15 min (primeiro acesso leva ~50 s) |
 
 Depois que a API subir no Render, coloque a URL dela em `NEXT_PUBLIC_API_URL` no projeto do app na Vercel e faça um novo deploy (variáveis `NEXT_PUBLIC_` entram no build).
 
